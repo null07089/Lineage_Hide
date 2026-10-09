@@ -86,8 +86,8 @@ HEADER_TEXT = """/* SPDX-License-Identifier: GPL-2.0 */
  * application processes.  Only the display string is rewritten in place;
  * file access is not affected.
  */
-#ifndef _LINUX_YUKARI_HIDE_H
-#define _LINUX_YUKARI_HIDE_H
+#ifndef _LINUX_LINEAGE_HIDE_H
+#define _LINUX_LINEAGE_HIDE_H
 
 #include <linux/cred.h>
 #include <linux/kernel.h>
@@ -123,7 +123,7 @@ static inline void lineage_hide_scrub_rom_names(char *path)
 \t}
 }
 
-#endif /* _LINUX_YUKARI_HIDE_H */
+#endif /* _LINUX_LINEAGE_HIDE_H */
 """
 
 BASE_INCLUDE = "#include <linux/lineage_hide.h>"
