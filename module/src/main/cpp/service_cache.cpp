@@ -104,7 +104,7 @@ void clear_cache(JNIEnv *env) {
         }
         if (raw) {
             try {
-                if (hide_service(std::string(raw))) {
+                if (hide_service(raw)) {
                     jobject removed = env->CallObjectMethod(cache, remove, key);
                     if (removed) env->DeleteLocalRef(removed);
                     if (env->ExceptionCheck()) env->ExceptionClear();

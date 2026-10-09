@@ -49,7 +49,9 @@ public:
             return;
         }
         try {
-            load_config(*g_config);
+            if (!load_config(*g_config)) {
+                log_error("configuration unavailable; module disabled for this process");
+            }
         } catch (...) {
             // Treat a transient allocation/parser failure as an invalid
             // configuration. The module then fails closed for this process.
@@ -62,8 +64,7 @@ public:
 
     void preAppSpecialize(zygisk::AppSpecializeArgs *args) override {
         g_enabled_for_process = false;
-        g_jni_hook_ready_ = false;
-        g_resource_hook_ready_ = false;
+        resource_hook_ready_ = false;
         g_package_name.fill('\0');
         if (!args) return;
 
@@ -90,16 +91,15 @@ public:
         // the boot-class native method here, before post-specialization API
         // calls become implementation-defined.
         try {
-            g_jni_hook_ready_ = install_jni_hook(env_, api_);
+            install_jni_hook(env_, api_);
         } catch (...) {
-            g_jni_hook_ready_ = false;
-            log_error("JNI hook setup failed; will try ioctl fallback");
+            log_error("JNI hook setup failed; Binder filtering is skipped");
         }
         if (g_config->hide_lineage_resources) {
             try {
-                g_resource_hook_ready_ = install_resource_hook(env_, api_);
+                resource_hook_ready_ = install_resource_hook(env_, api_);
             } catch (...) {
-                g_resource_hook_ready_ = false;
+                resource_hook_ready_ = false;
                 log_error("resource hook setup failed; resources stay visible");
             }
         }
@@ -118,19 +118,8 @@ public:
         } catch (...) {
             log_error("cache cleanup failed; continuing with binder instrumentation");
         }
-        try {
-            // BinderProxy JNI interception leaves libbinder GOT/PLT untouched.
-            // Old releases without the stable JNI entry point use the existing
-            // ioctl path, whose callback is now reached through an anonymous RX
-            // trampoline.
-            if (!g_jni_hook_ready_) install_hooks(api_);
-        } catch (...) {
-            // Filtering is best-effort. Never let an allocation failure in
-            // optional instrumentation abort application startup.
-            log_error("fallback hook setup failed; continuing without fallback");
-        }
         log_info("enabled for %s (resource hide=%d)", g_package_name.data(),
-                 g_resource_hook_ready_ ? 1 : 0);
+                 resource_hook_ready_ ? 1 : 0);
     }
 
     void preServerSpecialize(zygisk::ServerSpecializeArgs *) override {
@@ -143,8 +132,7 @@ public:
 private:
     zygisk::Api *api_ = nullptr;
     JNIEnv *env_ = nullptr;
-    bool g_jni_hook_ready_ = false;
-    bool g_resource_hook_ready_ = false;
+    bool resource_hook_ready_ = false;
 };
 
 REGISTER_ZYGISK_MODULE(LineageHideModule)

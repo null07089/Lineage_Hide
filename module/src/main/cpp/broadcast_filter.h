@@ -1,7 +1,5 @@
 #pragma once
 
-#include <string>
+#include <string_view>
 
-// Returns true for LineageOS protected-broadcast actions that target apps must
-// not be able to recognize by sending them.
-bool hide_broadcast_action(const std::string &action);
+bool hide_broadcast_action(std::string_view action);

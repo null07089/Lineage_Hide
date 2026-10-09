@@ -8,6 +8,7 @@ namespace {
 constexpr const char *kTag = "LineageHide";
 
 void vlog(int prio, const char *fmt, va_list ap) {
+    if (!fmt) return;
     char buffer[1024]{};
     std::vsnprintf(buffer, sizeof(buffer), fmt, ap);
     __android_log_print(prio, kTag, "%s", buffer);

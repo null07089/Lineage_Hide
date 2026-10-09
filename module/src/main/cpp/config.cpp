@@ -75,15 +75,24 @@ bool parse_string(const std::string &text, size_t &pos, std::string &out) {
 }
 
 bool find_value(const std::string &text, const char *key, size_t &pos) {
-    std::string quoted_key = std::string("\"") + key + "\"";
-    const auto key_pos = text.find(quoted_key);
-    if (key_pos == std::string::npos) return false;
-    pos = key_pos + quoted_key.size();
-    skip_ws(text, pos);
-    if (pos >= text.size() || text[pos] != ':') return false;
-    ++pos;
-    skip_ws(text, pos);
-    return pos < text.size();
+    const std::string quoted_key = std::string("\"") + key + "\"";
+    size_t search = 0;
+    while (true) {
+        const size_t key_pos = text.find(quoted_key, search);
+        if (key_pos == std::string::npos) return false;
+        size_t value_pos = key_pos + quoted_key.size();
+        skip_ws(text, value_pos);
+        if (value_pos < text.size() && text[value_pos] == ':') {
+            ++value_pos;
+            skip_ws(text, value_pos);
+            if (value_pos >= text.size()) return false;
+            pos = value_pos;
+            return true;
+        }
+        // A string value may contain the key text; keep searching for the
+        // real key, which is the one followed by a colon.
+        search = key_pos + quoted_key.size();
+    }
 }
 
 bool parse_bool(const std::string &text, const char *key, bool &value) {

@@ -1,7 +1,11 @@
 #pragma once
 
-#include <string>
+#include <cstddef>
+#include <string_view>
 
-// Returns true when the given system feature name belongs to the LineageOS
-// platform and should be presented as nonexistent inside target processes.
-bool hide_feature(const std::string &feature_name);
+// Bounds of the hidden feature names.  The Parcel read hook uses them to skip
+// unrelated strings before extracting their characters.
+constexpr std::size_t kFeatureNameMinLength = 19;
+constexpr std::size_t kFeatureNameMaxLength = 27;
+
+bool hide_feature(std::string_view feature_name);

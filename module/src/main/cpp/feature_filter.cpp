@@ -16,14 +16,15 @@ constexpr const char *kFeatures[] = {
     "org.lineageos.settings",
 };
 
-bool equals(const std::string &value, const char *needle) {
+bool equals(std::string_view value, const char *needle) {
     if (!needle) return false;
-    const size_t length = std::char_traits<char>::length(needle);
-    return value.size() == length && (length == 0 || std::memcmp(value.data(), needle, length) == 0);
+    const std::size_t length = std::char_traits<char>::length(needle);
+    return value.size() == length &&
+           (length == 0 || std::memcmp(value.data(), needle, length) == 0);
 }
 } // namespace
 
-bool hide_feature(const std::string &feature_name) {
+bool hide_feature(std::string_view feature_name) {
     for (const char *feature : kFeatures) {
         if (equals(feature_name, feature)) return true;
     }

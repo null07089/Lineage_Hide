@@ -28,16 +28,16 @@ jobs:
       TZ: Asia/Shanghai
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
         with:
           packages: platform-tools
           log-accepted-android-sdk-licenses: 'false'
@@ -65,7 +65,7 @@ jobs:
           "$sdk_root/ndk/27.2.12479018/ndk-build" --version | head -n 1
 
       - name: Set up Gradle 8.11.1
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@48b5f213c81028ace310571dc5ec0fbbca0b2947 # v4
         with:
           gradle-version: '8.11.1'
 
@@ -86,9 +86,9 @@ jobs:
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             version="${GITHUB_REF_NAME#v}"
           elif [[ "${GITHUB_REF_NAME}" == "Dev" || "${GITHUB_REF_NAME}" == "dev" ]]; then
-            version="1.0-dev (${run_number}-${short_sha})"
+            version="1.1-dev (${run_number}-${short_sha})"
           else
-            version="1.0 (${run_number}-${short_sha})"
+            version="1.1 (${run_number}-${short_sha})"
           fi
           # versionCode is maintained in module.prop so release tags keep the
           # expected value (v2.0 -> 2) and Magisk update checks stay monotonic.
@@ -140,7 +140,7 @@ jobs:
           echo '[verify] package and ELF checks passed'
 
       - name: Upload module artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: Lineage_Hide-${{ github.run_id }}
           path: out/Lineage_Hide.zip
@@ -149,7 +149,7 @@ jobs:
 
       - name: Publish GitHub release for tag
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: out/Lineage_Hide.zip
           generate_release_notes: true
@@ -185,7 +185,7 @@ jobs:
 
       - name: Upload build diagnostics
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: Lineage_Hide-diagnostics-${{ github.run_id }}
           path: |

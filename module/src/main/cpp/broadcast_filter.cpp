@@ -19,14 +19,15 @@ constexpr const char *kActions[] = {
     "lineageos.platform.intent.action.CHARGING_CONTROL_CANCEL_ONCE",
 };
 
-bool equals(const std::string &value, const char *needle) {
+bool equals(std::string_view value, const char *needle) {
     if (!needle) return false;
-    const size_t length = std::char_traits<char>::length(needle);
-    return value.size() == length && (length == 0 || std::memcmp(value.data(), needle, length) == 0);
+    const std::size_t length = std::char_traits<char>::length(needle);
+    return value.size() == length &&
+           (length == 0 || std::memcmp(value.data(), needle, length) == 0);
 }
 } // namespace
 
-bool hide_broadcast_action(const std::string &action) {
+bool hide_broadcast_action(std::string_view action) {
     for (const char *candidate : kActions) {
         if (equals(action, candidate)) return true;
     }

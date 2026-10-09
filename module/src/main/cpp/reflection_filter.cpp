@@ -19,6 +19,7 @@ GetFieldsFn g_original_get_declared_fields = nullptr;
 GetFieldsBoolFn g_original_get_declared_fields0 = nullptr;
 GetFieldsBoolFn g_original_get_declared_fields_unchecked = nullptr;
 jmethodID g_field_get_name = nullptr;
+jclass g_asset_manager_class = nullptr;
 bool g_field_hooks_installed = false;
 
 void clear_jni_exception(JNIEnv *env) {
@@ -45,6 +46,16 @@ std::string jstring_to_ascii(JNIEnv *env, jstring value) {
 bool jstring_equals(JNIEnv *env, jstring value, const char *needle) {
     if (!env || !value || !needle) return false;
     return jstring_to_ascii(env, value) == needle;
+}
+
+// Filtering is scoped to AssetManager so unrelated reflection in target apps
+// is left alone.  When the class could not be resolved at install time the
+// filter falls back to name matching, keeping the fingerprint hidden at the
+// cost of touching every class.
+bool is_asset_manager_class(JNIEnv *env, jobject clazz) {
+    if (!env || !clazz) return false;
+    if (!g_asset_manager_class) return true;
+    return env->IsSameObject(clazz, g_asset_manager_class);
 }
 
 bool field_is_hidden(JNIEnv *env, jobject field) {
@@ -89,6 +100,7 @@ jobjectArray filter_field_array(JNIEnv *env, jobjectArray fields) {
     jobjectArray filtered = env->NewObjectArray(length - dropped, field_class, nullptr);
     if (!filtered || env->ExceptionCheck()) {
         clear_jni_exception(env);
+        env->DeleteLocalRef(field_class);
         return fields;
     }
     jsize write = 0;
@@ -100,17 +112,20 @@ jobjectArray filter_field_array(JNIEnv *env, jobjectArray fields) {
             if (env->ExceptionCheck()) {
                 clear_jni_exception(env);
                 env->DeleteLocalRef(field);
+                env->DeleteLocalRef(filtered);
+                env->DeleteLocalRef(field_class);
                 return fields;
             }
         }
         env->DeleteLocalRef(field);
     }
+    env->DeleteLocalRef(field_class);
     return filtered;
 }
 
 jobject hook_get_declared_field(JNIEnv *env, jobject clazz, jstring name) {
     if (!g_original_get_declared_field) return nullptr;
-    if (jstring_equals(env, name, kHiddenField)) {
+    if (is_asset_manager_class(env, clazz) && jstring_equals(env, name, kHiddenField)) {
         jclass exception = env->FindClass("java/lang/NoSuchFieldException");
         if (exception) env->ThrowNew(exception, kHiddenField);
         return nullptr;
@@ -121,30 +136,48 @@ jobject hook_get_declared_field(JNIEnv *env, jobject clazz, jstring name) {
 // Class.getField() turns a null result into NoSuchFieldException.
 jobject hook_get_public_field(JNIEnv *env, jobject clazz, jstring name) {
     if (!g_original_get_public_field) return nullptr;
-    if (jstring_equals(env, name, kHiddenField)) return nullptr;
+    if (is_asset_manager_class(env, clazz) && jstring_equals(env, name, kHiddenField)) {
+        return nullptr;
+    }
     return g_original_get_public_field(env, clazz, name);
 }
 
 jobjectArray hook_get_declared_fields(JNIEnv *env, jobject clazz) {
     if (!g_original_get_declared_fields) return nullptr;
-    return filter_field_array(env, g_original_get_declared_fields(env, clazz));
+    jobjectArray fields = g_original_get_declared_fields(env, clazz);
+    if (!is_asset_manager_class(env, clazz)) return fields;
+    return filter_field_array(env, fields);
 }
 
 jobjectArray hook_get_declared_fields0(JNIEnv *env, jobject clazz, jboolean public_only) {
     if (!g_original_get_declared_fields0) return nullptr;
-    return filter_field_array(env, g_original_get_declared_fields0(env, clazz, public_only));
+    jobjectArray fields = g_original_get_declared_fields0(env, clazz, public_only);
+    if (!is_asset_manager_class(env, clazz)) return fields;
+    return filter_field_array(env, fields);
 }
 
 jobjectArray hook_get_declared_fields_unchecked(JNIEnv *env, jobject clazz, jboolean public_only) {
     if (!g_original_get_declared_fields_unchecked) return nullptr;
-    return filter_field_array(env,
-                              g_original_get_declared_fields_unchecked(env, clazz, public_only));
+    jobjectArray fields =
+        g_original_get_declared_fields_unchecked(env, clazz, public_only);
+    if (!is_asset_manager_class(env, clazz)) return fields;
+    return filter_field_array(env, fields);
 }
 } // namespace
 
 bool install_field_hooks(JNIEnv *env, zygisk::Api *api) {
     if (g_field_hooks_installed) return true;
     if (!env || !api) return false;
+
+    if (!g_asset_manager_class) {
+        jclass local = env->FindClass("android/content/res/AssetManager");
+        if (local && !env->ExceptionCheck()) {
+            g_asset_manager_class = static_cast<jclass>(env->NewGlobalRef(local));
+            clear_jni_exception(env);
+        }
+        if (local) env->DeleteLocalRef(local);
+        clear_jni_exception(env);
+    }
 
     jclass field_class = env->FindClass("java/lang/reflect/Field");
     if (field_class && !env->ExceptionCheck()) {
@@ -208,6 +241,7 @@ bool install_field_hooks(JNIEnv *env, zygisk::Api *api) {
 
     if (installed == 0) return false;
     g_field_hooks_installed = true;
-    log_info("LINEAGE_APK_PATH hidden from reflection (%d/5 hooks)", installed);
+    log_info("LINEAGE_APK_PATH hidden from reflection (%d/5 hooks, scope=%s)", installed,
+             g_asset_manager_class ? "AssetManager" : "name-only");
     return true;
 }

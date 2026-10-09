@@ -23,9 +23,8 @@ awk '$4 == "FUNC" && $7 != "UND" && $8 == "zygisk_module_entry" { found=1 } END 
 if [[ -n "$PID" ]]; then
   echo "[maps] module and writable-executable mappings for pid $PID"
   adb shell "cat /proc/$PID/maps" | grep -E 'lineage_hide|rwxp' || true
-  echo "[GOT] JNI path leaves libbinder relocations untouched."
-  echo "      For the legacy ioctl fallback, resolve the ioctl slot with dladdr"
-  echo "      and verify it points at an anonymous r-xp trampoline."
+  echo "[GOT] Binder filtering uses the BinderProxy JNI hook; libbinder"
+  echo "      PLT/GOT relocations stay untouched."
 fi
 
 echo "verification complete"

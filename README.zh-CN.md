@@ -158,7 +158,7 @@ module/                      Magisk/KernelSU 模块
   src/main/cpp/              Zygisk native 代码
     entry.cpp                注册与 specialization 入口
     config.{h,cpp}           配置解析
-    binder_hook.{h,cpp}      ServiceManager/JNI/ioctl 钩子
+    binder_hook.{h,cpp}      ServiceManager BinderProxy JNI 钩子与过滤
     service_filter.{h,cpp}   服务名匹配
     service_cache.{h,cpp}    sCache 清理
     resource_hook.{h,cpp}    资源包隐藏
