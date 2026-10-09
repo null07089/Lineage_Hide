@@ -2,9 +2,6 @@
 
 Lineage Hide is a Zygisk module that removes LineageOS and other custom-ROM
 fingerprints from applications.  Every third-party app is covered
-automatically — there is no configuration file and no target list.  It was
-split from the Yukari project and re-implemented with an independent module id,
-boot companions and documentation.
 
 ## Pairing with SUSFS (important)
 
@@ -13,7 +10,7 @@ reports — path visibility, already-open file descriptors, system properties �
 is covered by SUSFS on a KernelSU kernel, and Lineage Hide ships the glue for
 it:
 
-- `service.sh` runs on every boot and uses the bundled `ksu_susfs` binary to
+- `service.sh` runs on every boot and uses the system-provided `ksu_susfs` command to
   register ROM-named files with `add_sus_path`, their mappings and idmaps with
   `add_sus_map`, and to delete or scrub lineage system properties with
   `resetprop`;

@@ -9,7 +9,6 @@ ui_print "==============================="
 set_perm_recursive "$MODPATH" 0 0 0755 0644
 set_perm "$MODPATH/customize.sh" 0 0 0755
 set_perm "$MODPATH/service.sh" 0 0 0755
-set_perm "$MODPATH/ksu_susfs" 0 0 0755
 
 ui_print "- Installation complete"
 ui_print "- All third-party applications are covered automatically"

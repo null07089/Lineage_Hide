@@ -32,8 +32,7 @@ mkdir -p "$STAGE/zygisk" "$OUT_DIR"
 cp "$ROOT_DIR/module/module.prop" "$STAGE/module.prop"
 cp "$ROOT_DIR/module/service.sh" "$STAGE/service.sh"
 cp "$ROOT_DIR/module/customize.sh" "$STAGE/customize.sh"
-cp "$ROOT_DIR/module/ksu_susfs" "$STAGE/ksu_susfs"
-chmod 0755 "$STAGE/service.sh" "$STAGE/customize.sh" "$STAGE/ksu_susfs"
+chmod 0755 "$STAGE/service.sh" "$STAGE/customize.sh"
 
 NATIVE_LIBRARY="$(find_native_library || true)"
 if [ -z "$NATIVE_LIBRARY" ]; then
@@ -53,6 +52,4 @@ test -s "$ZIP_PATH"
 unzip -l "$ZIP_PATH" | grep -q 'module.prop'
 unzip -l "$ZIP_PATH" | grep -q 'zygisk/arm64-v8a.so'
 unzip -l "$ZIP_PATH" | grep -q 'customize.sh'
-unzip -l "$ZIP_PATH" | grep -q 'ksu_susfs'
-unzip -Z "$ZIP_PATH" | grep -Eq '^-rwxr-xr-x.*[[:space:]]ksu_susfs$'
 echo "Packaged $ZIP_PATH from $NATIVE_LIBRARY"

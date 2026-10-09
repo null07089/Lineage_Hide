@@ -86,9 +86,9 @@ jobs:
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             version="${GITHUB_REF_NAME#v}"
           elif [[ "${GITHUB_REF_NAME}" == "Dev" || "${GITHUB_REF_NAME}" == "dev" ]]; then
-            version="1.2-dev (${run_number}-${short_sha})"
+            version="1.3-dev (${run_number}-${short_sha})"
           else
-            version="1.2 (${run_number}-${short_sha})"
+            version="1.3 (${run_number}-${short_sha})"
           fi
           # versionCode is maintained in module.prop so release tags keep the
           # expected value (v2.0 -> 2) and Magisk update checks stay monotonic.
@@ -120,11 +120,6 @@ jobs:
           unzip -l out/Lineage_Hide.zip | grep -q 'module.prop'
           unzip -l out/Lineage_Hide.zip | grep -q 'zygisk/arm64-v8a.so'
           unzip -l out/Lineage_Hide.zip | grep -q 'customize.sh'
-          unzip -l out/Lineage_Hide.zip | grep -q 'ksu_susfs'
-          if ! unzip -Z out/Lineage_Hide.zip | grep -Eq '^-rwxr-xr-x.*[[:space:]]ksu_susfs$'; then
-            echo '[verify] ksu_susfs is missing or not executable' >&2
-            exit 1
-          fi
           unzip -p out/Lineage_Hide.zip module.prop | grep -q '^version='
           unzip -p out/Lineage_Hide.zip zygisk/arm64-v8a.so > /tmp/lineage_hide.so
           symbols="$(readelf --wide -Ws /tmp/lineage_hide.so)"

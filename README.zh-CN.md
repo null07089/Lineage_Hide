@@ -1,16 +1,14 @@
 # Lineage Hide
 
 Lineage Hide 是一个 Zygisk 模块，用于隐藏 LineageOS / 自定义 ROM 指纹。
-**全部三方应用自动生效**——没有配置文件，也没有目标列表。项目从 Yukari 分割而来：
-重新整理、重新实现、重新撰写文档，使用独立模块 id（`lineage_hide`）、配套的开机
-注册脚本与内核补丁脚本。
+**全部三方应用生效**
 
 ## 与 SUSFS 搭配（重要）
 
 模块只能改变“目标进程内能看到什么”。内核对外报告的内容——路径可见性、已经打开
 的 fd、系统属性——依赖 KernelSU 内核上的 SUSFS，本项目内置配套胶水：
 
-- `service.sh` 每次开机调用内置的 `ksu_susfs`：
+- `service.sh` 每次开机调用系统提供的 `ksu_susfs`：
   - 把带 ROM 关键词的文件注册为 `add_sus_path`，使目录列表与路径查询对应用不可见；
   - 把文件映射与 idmap 注册为 `add_sus_map`，使其从应用 `/proc/self/maps` 中消失；
   - 用 `resetprop` 删除或清洗含 `lineage` 的系统属性；
@@ -142,7 +140,6 @@ module/                      Magisk/KernelSU 模块
   module.prop                模块标识（id=lineage_hide，version=1.2）
   service.sh                 开机：属性清理 + 系统包清单 + ksu_susfs 注册
   customize.sh               安装脚本（权限）
-  ksu_susfs                  SUSFS 用户态命令（随模块分发）
   src/main/cpp/              Zygisk native 代码
     entry.cpp                注入判定（uid + 系统包清单）与 specialization 入口
     binder_hook.{h,cpp}      ServiceManager BinderProxy JNI 钩子与过滤

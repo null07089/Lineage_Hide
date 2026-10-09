@@ -1,5 +1,4 @@
 #!/system/bin/sh
-PATH="${0%/*}:$PATH"
 
 # Wait for the boot animation, bounded so a headless or unusual boot cannot
 # block the service stage forever.
@@ -70,6 +69,7 @@ ksu_susfs add_sus_map "/product/overlay/framework-res__lineage_kebab__auto_gener
 ksu_susfs add_sus_map "/system/framework/org.lineageos.platform-res.apk"
 ksu_susfs add_sus_map "/vendor/overlay/org.lineageos.platform-res__lineage_kebab__auto_generated_rro_vendor.apk"
 
+sleep 3
 ksu_susfs add_sus_path_loop "/vendor/etc/selinux/vendor_hwservice_contexts"
 ksu_susfs add_sus_path_loop "/system_ext/etc/init/init.lineage-system_ext.rc"
 ksu_susfs add_sus_path "/system_ext/etc/permissions"
