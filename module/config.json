@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "force_denylist_unmount": true,
+  "hide_lineage_resources": true,
+  "hide_lineage_features": true,
+  "hide_lineage_broadcasts": true,
+  "targets": []
+}
