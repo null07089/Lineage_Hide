@@ -3,6 +3,13 @@
 Lineage Hide is a Zygisk module that removes LineageOS and other custom-ROM
 fingerprints from applications.  Every third-party app is covered
 
+## Compatibility notes
+
+- **If some applications fail to open**, switch to this Zygisk Next build:
+  <https://t.me/c/2022002916/124739> — the newer Zygisk injection
+  implementation has a spin issue when injecting 360-hardened apps.
+- **Demo video**: <https://b23.tv/437BHCi>
+
 ## Pairing with SUSFS (important)
 
 The module only changes what a target *process* can observe.  What the kernel
