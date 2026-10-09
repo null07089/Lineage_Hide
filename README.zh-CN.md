@@ -1,8 +1,9 @@
 # Lineage Hide
 
-Lineage Hide 是一个按目标应用生效的 Zygisk 模块，用于隐藏 LineageOS / 自定义
-ROM 指纹。项目从 Yukari 分割而来：1.0 是重新整理、重新实现、重新撰写文档的首版，
-使用新的模块 id（`lineage_hide`）、配套的开机注册脚本与内核补丁脚本。
+Lineage Hide 是一个 Zygisk 模块，用于隐藏 LineageOS / 自定义 ROM 指纹。
+**全部三方应用自动生效**——没有配置文件，也没有目标列表。项目从 Yukari 分割而来：
+重新整理、重新实现、重新撰写文档，使用独立模块 id（`lineage_hide`）、配套的开机
+注册脚本与内核补丁脚本。
 
 ## 与 SUSFS 搭配（重要）
 
@@ -22,57 +23,46 @@ ROM 指纹。项目从 Yukari 分割而来：1.0 是重新整理、重新实现�
 
 ## 隐藏通道总览
 
-| 通道 | 机制 | 开关 |
-| --- | --- | --- |
-| ServiceManager 服务 | `BinderProxy.transactNative` JNI hook；枚举/调试回复在 Parcel 层过滤；应用发起的直接 lookup 在私有请求副本中等长改写。关键词：`lineage`、`crdroid`、`aospa`、`pixelexperience`、`omnirom`、`protonaosp`，精确匹配 `profile` | 常开 |
-| 资源包 | AssetManager 名称/ID 查询把 `lineageos.platform`（资源包 id `0x3f`）按不存在处理 | `hide_lineage_resources` |
-| 系统 feature | 改写 `hasSystemFeature` 请求；`Parcel` 读取侧把 8 个 `org.lineageos.*` 名称替换为等长占位串 | `hide_lineage_features` |
-| 受保护广播 | 复制外发 `IActivityManager` 广播请求并等长替换 10 个 lineage Action | `hide_lineage_broadcasts` |
-| 反射常量 | `AssetManager.LINEAGE_APK_PATH` 从 `getDeclaredField`/`getField`/`getDeclaredFields` 系列中移除 | 常开 |
+| 通道 | 机制 |
+| --- | --- |
+| ServiceManager 服务 | `BinderProxy.transactNative` JNI hook；枚举/调试回复在 Parcel 层过滤；应用发起的直接 lookup 在私有请求副本中等长改写。关键词：`lineage`、`crdroid`、`aospa`、`pixelexperience`、`omnirom`、`protonaosp`，精确匹配 `profile` |
+| 资源包 | AssetManager 名称/ID 查询把 `lineageos.platform`（资源包 id `0x3f`）按不存在处理 |
+| 系统 feature | 改写 `hasSystemFeature` 请求；`Parcel` 读取侧把 8 个 `org.lineageos.*` 名称替换为等长占位串 |
+| 受保护广播 | 复制外发 `IActivityManager` 广播请求并等长替换 10 个 lineage Action |
+| 反射常量 | `AssetManager.LINEAGE_APK_PATH` 从 `getDeclaredField`/`getField`/`getDeclaredFields` 系列中移除（仅对 `AssetManager` 生效） |
 
-所有进程内通道都只作用于目标进程、保持长度不变，且不写 Binder 回复缓冲区。
+所有进程内通道都**常开**、只作用于被注入的应用进程、保持长度不变，且不写 Binder
+回复缓冲区。
 
-## 配置
+## 注入范围（无配置）
 
-`/data/adb/modules/lineage_hide/config.json`：
+模块在满足以下条件时注入一个进程：
 
-```json
-{
-  "enabled": true,
-  "force_denylist_unmount": true,
-  "hide_lineage_resources": true,
-  "hide_lineage_features": true,
-  "hide_lineage_broadcasts": true,
-  "targets": ["com.example.app"]
-}
-```
+1. uid 属于应用范围（`>= 10000`）；
+2. 其包名不在系统包清单中。
 
-- `enabled`：总开关，`false` 时模块不做任何事；
-- `force_denylist_unmount`：向 Zygisk 传递 `FORCE_DENYLIST_UNMOUNT`；目标应用
-  依赖 Magisk 挂载时可设为 `false`；
-- `hide_lineage_resources`：在目标进程隐藏 `lineageos.platform` 资源包（需
-  Android 9+ 的 AssetManager 入口）；真正使用 Lineage SDK 资源的应用在该进程内
-  会失去这些资源；
-- `hide_lineage_features`：隐藏 `org.lineageos.*` 系统 feature；
-- `hide_lineage_broadcasts`：改写 Lineage 受保护广播 Action，使发送行为等同 AOSP，
-  而不是抛 `SecurityException`；
-- `targets`：生效的包名列表；受保护包与系统进程始终跳过。
+`service.sh` 每次开机会用 `pm list packages -s` 生成系统包清单
+（`/data/adb/modules/lineage_hide/system_packages.txt`），因此**只有三方应用**
+会被注入；清单生成前（刚安装后的首次开机）有一段硬编码回退保护，覆盖
+SystemUI、Settings、权限控制器、核心 providers、核心服务与 `org.lineageos.*`
+应用。`FORCE_DENYLIST_UNMOUNT` 始终开启。
 
-`module/action.sh`（安装为 `/data/adb/modules/lineage_hide/action.sh`）可交互
-管理目标列表；超时或无法读取输入时保留原配置。
+如需放过某个三方应用，把它的包名临时加进 `system_packages.txt` 即可（下次开机会
+被重新生成覆盖）。
 
 ## 启动集成（service.sh）
 
 开机动画启动后，模块会：
 
 1. 删除名称含 `lineage` 的系统属性，改写值中含 `lineage` 的属性；
-2. 遍历 `/system`、`/vendor`、`/system_ext`、`/product` 中带 `*lineage*` 和
+2. 生成系统包清单（供注入范围判断使用）；
+3. 遍历 `/system`、`/vendor`、`/system_ext`、`/product` 中带 `*lineage*` 和
    `*gapps*` 的条目，交给 `ksu_susfs add_sus_path`（普通文件同时
    `add_sus_map`）；
-3. 追加注册：`addon.d`、LineageOS 更新目录、SELinux 策略文件、平台资源包的
+4. 追加注册：`addon.d`、LineageOS 更新目录、SELinux 策略文件、平台资源包的
    RRO 与 idmap、模块自身 native 库与 Zygisk 库。
 
-所有注册都是幂等的，重启重复执行没有副作用。
+所有步骤都是幂等的，重启重复执行没有副作用。
 
 ## 内核侧路径隐藏
 
@@ -107,25 +97,26 @@ bash scripts/package.sh
 
 ## 分阶段验证
 
-1. **模块加载**：目标应用启动后 `logcat -s LineageHide` 应出现
-   `matched target <包名>` 与 `enabled for <包名>`；
-2. **ServiceManager**：目标应用内枚举服务列表不应出现关键词服务；
-   非目标对照应用仍能看到；
-3. **资源包**：目标应用内
+1. **模块加载**：三方应用启动后 `logcat -s LineageHide` 应出现
+   `enabled uid=<uid> process=<进程名>`；系统应用（Settings、SystemUI、
+   `org.lineageos.*`）不应出现该行；
+2. **ServiceManager**：三方应用内枚举服务列表不应出现关键词服务；
+   Settings 等系统应用仍能看到；
+3. **资源包**：三方应用内
    `getIdentifier("config_enableLiveDisplay", "bool", "lineageos.platform")`
-   返回 `0`；非目标应用仍返回真实 ID；
-4. **feature**：目标应用内
+   返回 `0`；系统应用仍返回真实 ID；
+4. **feature**：三方应用内
    `hasSystemFeature("org.lineageos.livedisplay")` 为 `false`，
    `getSystemAvailableFeatures()` 无真实 `org.lineageos.*` 名称；
-5. **广播**：目标应用发送
+5. **广播**：三方应用发送
    `lineageos.intent.action.REFRESH_PREFERENCE` 不抛异常，日志出现
    `scrubbed N lineage broadcast action(s)`；
-6. **反射常量**：目标应用内
+6. **反射常量**：三方应用内
    `AssetManager.class.getDeclaredField("LINEAGE_APK_PATH")` 抛
-   `NoSuchFieldException`；非目标应用仍可见；
+   `NoSuchFieldException`；系统应用仍可见；
 7. **SUSFS 注册**：`ksu_susfs` 的注册结果可在管理器/SUSFS 状态中查看；
-   目标应用 `/proc/self/maps` 不应出现模块 `.so` 与 lineage 路径；
-8. **内核补丁**：目标应用 `/proc/self/fd/*` 的 readlink 目标含关键词时显示为
+   应用 `/proc/self/maps` 不应出现模块 `.so` 与 lineage 路径；
+8. **内核补丁**：应用 `/proc/self/fd/*` 的 readlink 目标含关键词时显示为
    等长改写（如 `lineagx`）；root 进程不受影响。
 
 ## 设计约束与经验
@@ -148,16 +139,12 @@ bash scripts/package.sh
 
 ```
 module/                      Magisk/KernelSU 模块
-  module.prop                模块标识（id=lineage_hide，version=1.0）
-  config.json                默认配置
-  post-fs-data.sh            首次安装时生成默认配置
-  service.sh                 开机：ksu_susfs 注册 + 属性清理
-  action.sh                  目标应用选择
-  customize.sh               安装脚本（权限、保留旧配置）
+  module.prop                模块标识（id=lineage_hide，version=1.2）
+  service.sh                 开机：属性清理 + 系统包清单 + ksu_susfs 注册
+  customize.sh               安装脚本（权限）
   ksu_susfs                  SUSFS 用户态命令（随模块分发）
   src/main/cpp/              Zygisk native 代码
-    entry.cpp                注册与 specialization 入口
-    config.{h,cpp}           配置解析
+    entry.cpp                注入判定（uid + 系统包清单）与 specialization 入口
     binder_hook.{h,cpp}      ServiceManager BinderProxy JNI 钩子与过滤
     service_filter.{h,cpp}   服务名匹配
     service_cache.{h,cpp}    sCache 清理

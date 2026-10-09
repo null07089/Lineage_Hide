@@ -1,9 +1,10 @@
 # Lineage Hide
 
-Lineage Hide is a target-scoped Zygisk module that removes LineageOS and other
-custom-ROM fingerprints from selected applications.  It was split from the
-Yukari project and re-implemented as version 1.0 with a new module id, boot
-companions and documentation.
+Lineage Hide is a Zygisk module that removes LineageOS and other custom-ROM
+fingerprints from applications.  Every third-party app is covered
+automatically — there is no configuration file and no target list.  It was
+split from the Yukari project and re-implemented with an independent module id,
+boot companions and documentation.
 
 ## Pairing with SUSFS (important)
 
@@ -26,47 +27,33 @@ native file and property scanners can still fingerprint the ROM.
 
 ## Hidden channels
 
-| Channel | Mechanism | Switch |
-| --- | --- | --- |
-| ServiceManager services | `BinderProxy.transactNative` JNI hook; enumeration and debug replies are filtered in the Parcel layer, direct app lookups are rewritten in a private request copy. Keywords: `lineage`, `crdroid`, `aospa`, `pixelexperience`, `omnirom`, `protonaosp`, plus the exact name `profile` | always on |
-| Resource package | AssetManager name/ID lookups treat `lineageos.platform` (resource package id `0x3f`) as absent | `hide_lineage_resources` |
-| System features | `hasSystemFeature` requests are rewritten and the Parcel read path returns equal-length placeholders for the eight `org.lineageos.*` names | `hide_lineage_features` |
-| Protected broadcasts | the ten lineage protected actions are replaced in a private copy of outbound `IActivityManager` requests | `hide_lineage_broadcasts` |
-| Reflection constant | `AssetManager.LINEAGE_APK_PATH` is removed from `getDeclaredField`, `getField` and the `getDeclaredFields` family | always on |
+| Channel | Mechanism |
+| --- | --- |
+| ServiceManager services | `BinderProxy.transactNative` JNI hook; enumeration and debug replies are filtered in the Parcel layer, direct app lookups are rewritten in a private request copy. Keywords: `lineage`, `crdroid`, `aospa`, `pixelexperience`, `omnirom`, `protonaosp`, plus the exact name `profile` |
+| Resource package | AssetManager name/ID lookups treat `lineageos.platform` (resource package id `0x3f`) as absent |
+| System features | `hasSystemFeature` requests are rewritten and the Parcel read path returns equal-length placeholders for the eight `org.lineageos.*` names |
+| Protected broadcasts | the ten lineage protected actions are replaced in a private copy of outbound `IActivityManager` requests |
+| Reflection constant | `AssetManager.LINEAGE_APK_PATH` is removed from `getDeclaredField`, `getField` and the `getDeclaredFields` family (AssetManager only) |
 
-All in-process channels are length-preserving, process-local and never write
-into Binder reply buffers.
+All in-process channels are always on, length-preserving, process-local and
+never write into Binder reply buffers.
 
-## Configuration
+## Injection scope
 
-`/data/adb/modules/lineage_hide/config.json`:
+There is no configuration.  The module injects a process when:
 
-```json
-{
-  "enabled": true,
-  "force_denylist_unmount": true,
-  "hide_lineage_resources": true,
-  "hide_lineage_features": true,
-  "hide_lineage_broadcasts": true,
-  "targets": ["com.example.app"]
-}
-```
+1. its uid is an application uid (`>= 10000`), and
+2. its package is not a system package.
 
-- `enabled` — master switch; the module does nothing when `false`.
-- `force_denylist_unmount` — pass `FORCE_DENYLIST_UNMOUNT` to Zygisk.  Set to
-  `false` on devices where target apps depend on Magisk-provided mounts.
-- `hide_lineage_resources` — hide the `lineageos.platform` resource package
-  from target processes (Android 9+ entry points).  Apps that legitimately
-  consume Lineage SDK resources lose them inside that process.
-- `hide_lineage_features` — hide the `org.lineageos.*` system features.
-- `hide_lineage_broadcasts` — rewrite lineage protected-broadcast actions so
-  sending them behaves like AOSP instead of raising `SecurityException`.
-- `targets` — package names the module applies to.  Protected packages and
-  system processes are always skipped.
+`service.sh` records the system packages at every boot
+(`/data/adb/modules/lineage_hide/system_packages.txt`, generated from
+`pm list packages -s`), so only third-party applications are touched.  In the
+boot window before that list exists, a small hardcoded fallback protects
+SystemUI, Settings, the permission controller, core providers, core services
+and `org.lineageos.*` apps.  `FORCE_DENYLIST_UNMOUNT` is always requested.
 
-`module/action.sh` (installed as
-`/data/adb/modules/lineage_hide/action.sh`) manages the target list
-interactively; a timeout or unavailable input preserves the existing file.
+To exclude an app, freeze it from the module by adding its package to
+`system_packages.txt` (the file is regenerated on the next boot).
 
 ## Boot integration (`service.sh`)
 
@@ -74,14 +61,15 @@ After the boot animation starts, the module:
 
 1. deletes system properties whose name contains `lineage` and rewrites values
    that contain `lineage`;
-2. walks `/system`, `/vendor`, `/system_ext` and `/product` for `*lineage*` and
+2. records the system package list used by the injection scope above;
+3. walks `/system`, `/vendor`, `/system_ext` and `/product` for `*lineage*` and
    `*gapps*` entries and registers them with `ksu_susfs add_sus_path`
    (`add_sus_map` for regular files);
-3. registers additional paths and maps: `addon.d`, the LineageOS update
+4. registers additional paths and maps: `addon.d`, the LineageOS update
    directory, SELinux policy files, the platform resource RRO and its idmaps,
    the module's own native library and the Zygisk library.
 
-Every registration is idempotent and safe to repeat on the next boot.
+Every step is idempotent and safe to repeat on the next boot.
 
 ## Kernel-side path hiding
 
@@ -122,11 +110,12 @@ module updates from the repository's releases.
 Quick checks; the detailed checklist with commands is in
 [README.zh-CN.md](README.zh-CN.md).
 
-- In a target process: `getSystemAvailableFeatures()` shows no
+- In a third-party app: `getSystemAvailableFeatures()` shows no
   `org.lineageos.*` names, the `lineageos.platform` resource id `0x3f` is
   absent, and `AssetManager.class.getDeclaredField("LINEAGE_APK_PATH")` throws
   `NoSuchFieldException`.
-- In a non-target process all of the above must still be visible.
+- In a system app (Settings, SystemUI, `org.lineageos.*`) all of the above must
+  still be visible, since those processes are never injected.
 - `logcat -s LineageHide` shows the hook installation lines; `service.sh`
   output appears in the kernel/manager log.
 

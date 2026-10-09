@@ -3,7 +3,6 @@ project(LineageHide)
 
 add_library(lineage_hide SHARED
     entry.cpp
-    config.cpp
     service_filter.cpp
     service_cache.cpp
     binder_hook.cpp

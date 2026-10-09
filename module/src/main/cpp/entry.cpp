@@ -1,23 +1,28 @@
 #include "binder_hook.h"
-#include "config.h"
-#include "reflection_filter.h"
 #include "log.h"
+#include "reflection_filter.h"
 #include "resource_hook.h"
 #include "service_cache.h"
 #include "zygisk.hpp"
 
 #include <jni.h>
 #include <array>
+#include <cstdio>
 #include <cstring>
-#include <new>
 #include <string>
 
 namespace {
-// Keep process-lifetime state trivially destructible.  Zygote children are
-// short-lived and registering C++ destructors in libc's atexit array merely
-// creates an unnecessary runtime fingerprint.
-Config *g_config = nullptr; // intentionally leaked until process exit
-std::array<char, 256> g_package_name{};
+// Android assigns application processes uids starting at 10000; system
+// components live below that.  Every third-party application process is
+// injected, so the module needs no target list or configuration file.
+constexpr jint kAppUidStart = 10000;
+
+// Written at boot by service.sh: one system package per line.  When the list
+// is present it is authoritative, so only third-party apps are injected.
+constexpr const char *kSystemPackageList =
+    "/data/adb/modules/lineage_hide/system_packages.txt";
+
+std::array<char, 256> g_process_name{};
 bool g_enabled_for_process = false;
 
 std::string jstr_to_str(JNIEnv *env, jstring value) {
@@ -36,6 +41,59 @@ std::string jstr_to_str(JNIEnv *env, jstring value) {
         return {};
     }
 }
+
+std::string package_from_process_name(const std::string &name) {
+    const std::size_t colon = name.find(':');
+    return colon == std::string::npos ? name : name.substr(0, colon);
+}
+
+// Safety boundary for the boot window before service.sh has written the
+// package list: never inject the ROM's own critical components.
+bool is_fallback_system_component(const std::string &package) {
+    constexpr const char *kExcludedPrefixes[] = {
+        "android.process.",
+        "com.android.systemui",
+        "com.android.settings",
+        "com.android.permissioncontroller",
+        "com.android.providers.",
+        "com.android.externalstorage",
+        "com.android.documentsui",
+        "com.android.phone",
+        "com.android.server.telecom",
+        "com.android.bluetooth",
+        "com.android.nfc",
+        "com.android.inputmethod.",
+        "org.lineageos.",
+    };
+    for (const char *prefix : kExcludedPrefixes) {
+        if (package.rfind(prefix, 0) == 0) return true;
+    }
+    return false;
+}
+
+bool is_system_package(const std::string &package) {
+    if (package.empty()) return true;
+    FILE *fp = std::fopen(kSystemPackageList, "r");
+    if (fp) {
+        char line[256];
+        bool list_has_entries = false;
+        while (std::fgets(line, sizeof(line), fp)) {
+            std::size_t length = std::strlen(line);
+            while (length > 0 && (line[length - 1] == '\n' || line[length - 1] == '\r')) {
+                line[--length] = '\0';
+            }
+            if (length == 0) continue;
+            list_has_entries = true;
+            if (package == line) {
+                std::fclose(fp);
+                return true;
+            }
+        }
+        std::fclose(fp);
+        if (list_has_entries) return false;
+    }
+    return is_fallback_system_component(package);
+}
 } // namespace
 
 class LineageHideModule : public zygisk::ModuleBase {
@@ -43,72 +101,56 @@ public:
     void onLoad(zygisk::Api *api, JNIEnv *env) override {
         api_ = api;
         env_ = env;
-        if (!g_config) g_config = new (std::nothrow) Config();
-        if (!g_config) {
-            log_error("configuration allocation failed; module disabled");
-            return;
-        }
-        try {
-            if (!load_config(*g_config)) {
-                log_error("configuration unavailable; module disabled for this process");
-            }
-        } catch (...) {
-            // Treat a transient allocation/parser failure as an invalid
-            // configuration. The module then fails closed for this process.
-            g_config->enabled = false;
-            g_config->force_denylist_unmount = true;
-            g_config->targets.clear();
-            log_error("configuration load failed; module disabled");
-        }
     }
 
     void preAppSpecialize(zygisk::AppSpecializeArgs *args) override {
         g_enabled_for_process = false;
         resource_hook_ready_ = false;
-        g_package_name.fill('\0');
+        g_process_name.fill('\0');
         if (!args) return;
 
-        const std::string package_name = jstr_to_str(env_, args->nice_name);
-        if (!package_name.empty()) {
-            const size_t count = (package_name.size() < g_package_name.size() - 1)
-                                     ? package_name.size()
-                                     : g_package_name.size() - 1;
-            std::memcpy(g_package_name.data(), package_name.data(), count);
-            g_package_name[count] = '\0';
+        if (args->uid < kAppUidStart) {
+            if (api_) api_->setOption(zygisk::Option::DLCLOSE_MODULE_LIBRARY);
+            return;
         }
-        if (!g_config || !is_target(*g_config, package_name)) {
+
+        const std::string process_name = jstr_to_str(env_, args->nice_name);
+        if (!process_name.empty()) {
+            const size_t count = (process_name.size() < g_process_name.size() - 1)
+                                     ? process_name.size()
+                                     : g_process_name.size() - 1;
+            std::memcpy(g_process_name.data(), process_name.data(), count);
+            g_process_name[count] = '\0';
+        }
+        if (is_system_package(package_from_process_name(process_name))) {
             if (api_) api_->setOption(zygisk::Option::DLCLOSE_MODULE_LIBRARY);
             return;
         }
 
         g_enabled_for_process = true;
-        if (api_ && g_config->force_denylist_unmount) {
-            api_->setOption(zygisk::Option::FORCE_DENYLIST_UNMOUNT);
-        }
-        set_feature_filtering(g_config->hide_lineage_features);
-        set_broadcast_filtering(g_config->hide_lineage_broadcasts);
+        if (api_) api_->setOption(zygisk::Option::FORCE_DENYLIST_UNMOUNT);
+        set_feature_filtering(true);
+        set_broadcast_filtering(true);
         // The Zygisk API is guaranteed to be live in preAppSpecialize.  Hook
-        // the boot-class native method here, before post-specialization API
+        // the boot-class native methods here, before post-specialization API
         // calls become implementation-defined.
         try {
             install_jni_hook(env_, api_);
         } catch (...) {
             log_error("JNI hook setup failed; Binder filtering is skipped");
         }
-        if (g_config->hide_lineage_resources) {
-            try {
-                resource_hook_ready_ = install_resource_hook(env_, api_);
-            } catch (...) {
-                resource_hook_ready_ = false;
-                log_error("resource hook setup failed; resources stay visible");
-            }
+        try {
+            resource_hook_ready_ = install_resource_hook(env_, api_);
+        } catch (...) {
+            resource_hook_ready_ = false;
+            log_error("resource hook setup failed; resources stay visible");
         }
         try {
             install_field_hooks(env_, api_);
         } catch (...) {
             log_error("field hook setup failed; LINEAGE_APK_PATH stays visible");
         }
-        log_info("matched target %s", g_package_name.data());
+        log_info("enabled uid=%d process=%s", args->uid, g_process_name.data());
     }
 
     void postAppSpecialize(const zygisk::AppSpecializeArgs *) override {
@@ -118,7 +160,7 @@ public:
         } catch (...) {
             log_error("cache cleanup failed; continuing with binder instrumentation");
         }
-        log_info("enabled for %s (resource hide=%d)", g_package_name.data(),
+        log_info("active for %s (resource hide=%d)", g_process_name.data(),
                  resource_hook_ready_ ? 1 : 0);
     }
 

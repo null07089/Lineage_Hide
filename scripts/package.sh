@@ -30,13 +30,10 @@ find_native_library() {
 rm -rf "$STAGE" "$ZIP_PATH"
 mkdir -p "$STAGE/zygisk" "$OUT_DIR"
 cp "$ROOT_DIR/module/module.prop" "$STAGE/module.prop"
-cp "$ROOT_DIR/module/config.json" "$STAGE/config.json"
-cp "$ROOT_DIR/module/post-fs-data.sh" "$STAGE/post-fs-data.sh"
 cp "$ROOT_DIR/module/service.sh" "$STAGE/service.sh"
-cp "$ROOT_DIR/module/action.sh" "$STAGE/action.sh"
 cp "$ROOT_DIR/module/customize.sh" "$STAGE/customize.sh"
 cp "$ROOT_DIR/module/ksu_susfs" "$STAGE/ksu_susfs"
-chmod 0755 "$STAGE/post-fs-data.sh" "$STAGE/service.sh" "$STAGE/action.sh" "$STAGE/customize.sh" "$STAGE/ksu_susfs"
+chmod 0755 "$STAGE/service.sh" "$STAGE/customize.sh" "$STAGE/ksu_susfs"
 
 NATIVE_LIBRARY="$(find_native_library || true)"
 if [ -z "$NATIVE_LIBRARY" ]; then
@@ -55,7 +52,6 @@ cp "$NATIVE_LIBRARY" "$STAGE/zygisk/arm64-v8a.so"
 test -s "$ZIP_PATH"
 unzip -l "$ZIP_PATH" | grep -q 'module.prop'
 unzip -l "$ZIP_PATH" | grep -q 'zygisk/arm64-v8a.so'
-unzip -l "$ZIP_PATH" | grep -q 'action.sh'
 unzip -l "$ZIP_PATH" | grep -q 'customize.sh'
 unzip -l "$ZIP_PATH" | grep -q 'ksu_susfs'
 unzip -Z "$ZIP_PATH" | grep -Eq '^-rwxr-xr-x.*[[:space:]]ksu_susfs$'

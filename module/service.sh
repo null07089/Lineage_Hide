@@ -30,6 +30,16 @@ if command -v resetprop >/dev/null 2>&1; then
     }'
 fi
 
+# Record the system packages so the Zygisk module can skip them without any
+# user configuration: only third-party applications are injected.
+MODDIR="${0%/*}"
+pm list packages -s --user 0 2>/dev/null | sed 's/^package://' | sort -u > "$MODDIR/system_packages.txt.tmp"
+if [ -s "$MODDIR/system_packages.txt.tmp" ]; then
+    mv -f "$MODDIR/system_packages.txt.tmp" "$MODDIR/system_packages.txt"
+else
+    rm -f "$MODDIR/system_packages.txt.tmp"
+fi
+
 # Everything below registers SUSFS entries; without SUSFS the script stops
 # here instead of logging a failure for every call.
 if ! command -v ksu_susfs >/dev/null 2>&1; then
