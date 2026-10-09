@@ -165,7 +165,7 @@ jobs:
             "version": "${version}",
             "versionCode": ${version_code},
             "zipUrl": "https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}/Lineage_Hide.zip",
-            "changelog": "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${tag}"
+            "changelog": "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/changelog.md"
           }
           EOF
           cat update.json
