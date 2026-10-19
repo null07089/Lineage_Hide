@@ -37,6 +37,9 @@ Lineage Hide 是一个 Zygisk 模块，用于隐藏 LineageOS / 自定义 ROM �
   - 把文件映射与 idmap 注册为 `add_sus_map`，使其从应用 `/proc/self/maps` 中消失；
   - 用 `resetprop` 删除或清洗含 `lineage` 的系统属性；
   - 隐藏模块自身的 `zygisk/arm64-v8a.so` 与 Zygisk 库；
+- `post-fs-data.sh` 在 zygote 映射之前把 Zygisk Next 库与本模块的
+  `zygisk/arm64-v8a.so` 注册到 `add_sus_map`，因此应用继承的映射不会在
+  `/proc/self/maps` 中暴露 `zygisk` 路径；
 - 从 zygote 继承的 fd 的 readlink 目标（`/proc/<pid>/fd/*`）需要
   `scripts/patch-kernel.sh` 打的内核补丁；SUSFS 单独不会改写它。
 
@@ -58,10 +61,15 @@ Lineage Hide 是一个 Zygisk 模块，用于隐藏 LineageOS / 自定义 ROM �
 
 ## 注入范围（无配置）
 
-模块在满足以下条件时注入一个进程：
+模块**不会**注入应用 zygote（`is_child_zygote`）与隔离进程（uid
+90000–99999）。这两类进程常被检测器当作探针：注入应用 zygote 会改变其
+fork/日志顺序，隔离进程则本应看不到应用的 Zygisk 状态。应用自身的普通进程
+仍会注入，隐藏效果不变。
+
+其余进程满足以下条件时注入：
 
 1. uid 属于应用范围（`>= 10000`）；
-2. 其包名不在系统包清单中。
+2. 其包名既不在系统包清单中，也不在豁免名单中。
 
 `service.sh` 每次开机会用 `pm list packages -s` 生成系统包清单
 （`/data/adb/modules/lineage_hide/system_packages.txt`），因此**只有三方应用**
@@ -69,8 +77,21 @@ Lineage Hide 是一个 Zygisk 模块，用于隐藏 LineageOS / 自定义 ROM �
 SystemUI、Settings、权限控制器、核心 providers、核心服务与 `org.lineageos.*`
 应用。`FORCE_DENYLIST_UNMOUNT` 始终开启。
 
-如需放过某个三方应用，把它的包名临时加进 `system_packages.txt` 即可（下次开机会
-被重新生成覆盖）。
+如需放过某个三方应用，把它的包名写进
+`/data/adb/lineage_hide/exempt.txt`（每行一个，`#` 开头为注释）。该文件位于
+模块目录之外，升级模块不会丢失；旧的
+`/data/adb/modules/lineage_hide/exempt.txt` 仍会被读取。
+
+## 应用一打开就退出时
+
+部分检测器（例如 `com.chunqiunativecheck` 春秋检测）在反篡改探针发现
+Zygisk 痕迹时会向自己发送 `SIGKILL`，因此 `logcat` 里没有 tombstone，进程
+直接消失。Lineage Hide 已避开两类可控探针：不注入应用 zygote 与隔离进程，
+并在 zygote 映射前用 `post-fs-data.sh` 注册 Zygisk 库。其余进程内探针需要
+在 Zygisk Next 中开启「链接器」与「匿名内存」，排除策略设为「仅还原挂载」。
+如果应用仍然退出，把它的包名加入
+`/data/adb/lineage_hide/exempt.txt`：应用将以未注入状态运行，能看到真实
+ROM，但不会再闪退。
 
 ## 启动集成（service.sh）
 
@@ -225,7 +246,8 @@ bash scripts/package.sh
 
 ```
 module/                      Magisk/KernelSU 模块
-  module.prop                模块标识（id=lineage_hide，version=1.5.1）
+  module.prop                模块标识（id=lineage_hide，version=1.5.2）
+  post-fs-data.sh            zygote 映射前向 SUSFS 注册 Zygisk 库
   service.sh                 开机：服务列表/bootloader 属性伪装 + 系统包清单 + ksu_susfs 注册
   customize.sh               安装脚本（权限）
   src/main/cpp/              Zygisk native 代码

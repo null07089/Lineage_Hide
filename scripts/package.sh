@@ -31,8 +31,9 @@ rm -rf "$STAGE" "$ZIP_PATH"
 mkdir -p "$STAGE/zygisk" "$OUT_DIR"
 cp "$ROOT_DIR/module/module.prop" "$STAGE/module.prop"
 cp "$ROOT_DIR/module/service.sh" "$STAGE/service.sh"
+cp "$ROOT_DIR/module/post-fs-data.sh" "$STAGE/post-fs-data.sh"
 cp "$ROOT_DIR/module/customize.sh" "$STAGE/customize.sh"
-chmod 0755 "$STAGE/service.sh" "$STAGE/customize.sh"
+chmod 0755 "$STAGE/service.sh" "$STAGE/post-fs-data.sh" "$STAGE/customize.sh"
 
 NATIVE_LIBRARY="$(find_native_library || true)"
 if [ -z "$NATIVE_LIBRARY" ]; then

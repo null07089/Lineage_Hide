@@ -1,5 +1,12 @@
 # 更新日志
 
+## 1.5.2
+
+- 不再向应用 zygote（`is_child_zygote`）和隔离进程（uid 90000–99999）注入，修复春秋检测等应用在启动阶段自行发送 `SIGKILL` 闪退的问题
+- 新增 `post-fs-data.sh`：在 zygote 映射之前向 SUSFS 注册 Zygisk Next 与本模块的库，避免应用在自己的 `/proc/self/maps` 中看到 `zygisk` 路径
+- 新增持久化豁免名单 `/data/adb/lineage_hide/exempt.txt`（每行一个包名），升级模块不再丢失；兼容旧的模块目录 `exempt.txt`
+- `service.sh` 启动时创建豁免名单，并自动迁移旧位置的文件
+
 ## 1.5.1
 
 - `service.sh` 统一改用 `/system/bin/sh` 执行，避免部分环境下解释器不一致

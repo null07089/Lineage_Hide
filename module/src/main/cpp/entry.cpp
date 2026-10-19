@@ -17,10 +17,24 @@ namespace {
 // injected, so the module needs no target list or configuration file.
 constexpr jint kAppUidStart = 10000;
 
+// Isolated processes (AID_ISOLATED_START..AID_ISOLATED_END) are throwaway
+// sandboxes spawned for untrusted work.  Detectors use them as probes because
+// an isolated process cannot normally see the app's environment.  Injecting a
+// Zygisk module into them both risks breaking the probe and adds an obvious
+// injection surface, so they are left untouched.
+constexpr jint kIsolatedUidStart = 90000;
+constexpr jint kIsolatedUidEnd = 99999;
+
 // Written at boot by service.sh: one system package per line.  When the list
 // is present it is authoritative, so only third-party apps are injected.
 constexpr const char *kSystemPackageList =
     "/data/adb/modules/lineage_hide/system_packages.txt";
+
+// User-maintained exemption list.  The persistent location survives module
+// updates; the module directory is also read for backwards compatibility.
+constexpr const char *kExemptList = "/data/adb/lineage_hide/exempt.txt";
+constexpr const char *kLegacyExemptList =
+    "/data/adb/modules/lineage_hide/exempt.txt";
 
 std::array<char, 256> g_process_name{};
 bool g_enabled_for_process = false;
@@ -94,6 +108,38 @@ bool is_system_package(const std::string &package) {
     }
     return is_fallback_system_component(package);
 }
+
+bool is_isolated_uid(jint uid) {
+    return uid >= kIsolatedUidStart && uid <= kIsolatedUidEnd;
+}
+
+bool list_contains_package(const char *path, const std::string &package) {
+    FILE *fp = std::fopen(path, "r");
+    if (!fp) return false;
+    char line[256];
+    bool found = false;
+    while (!found && std::fgets(line, sizeof(line), fp)) {
+        char *comment = std::strchr(line, '#');
+        if (comment) *comment = '\0';
+        char *start = line;
+        while (*start == ' ' || *start == '\t') ++start;
+        char *end = start + std::strlen(start);
+        while (end > start &&
+               (end[-1] == '\n' || end[-1] == '\r' || end[-1] == ' ' || end[-1] == '\t')) {
+            --end;
+        }
+        *end = '\0';
+        if (*start != '\0' && package == start) found = true;
+    }
+    std::fclose(fp);
+    return found;
+}
+
+bool is_exempt_package(const std::string &package) {
+    if (package.empty()) return false;
+    return list_contains_package(kExemptList, package) ||
+           list_contains_package(kLegacyExemptList, package);
+}
 } // namespace
 
 class LineageHideModule : public zygisk::ModuleBase {
@@ -114,6 +160,20 @@ public:
             return;
         }
 
+        // App zygotes preload application code for isolated processes.  A
+        // detector can compare the fork/cookie order of its own app zygote and
+        // use any injected state there as proof that Zygisk ran first.  The
+        // main app process is still injected, so hiding is unaffected.
+        if (args->is_child_zygote && *args->is_child_zygote) {
+            if (api_) api_->setOption(zygisk::Option::DLCLOSE_MODULE_LIBRARY);
+            return;
+        }
+
+        if (is_isolated_uid(args->uid)) {
+            if (api_) api_->setOption(zygisk::Option::DLCLOSE_MODULE_LIBRARY);
+            return;
+        }
+
         const std::string process_name = jstr_to_str(env_, args->nice_name);
         if (!process_name.empty()) {
             const size_t count = (process_name.size() < g_process_name.size() - 1)
@@ -122,7 +182,8 @@ public:
             std::memcpy(g_process_name.data(), process_name.data(), count);
             g_process_name[count] = '\0';
         }
-        if (is_system_package(package_from_process_name(process_name))) {
+        const std::string package = package_from_process_name(process_name);
+        if (is_system_package(package) || is_exempt_package(package)) {
             if (api_) api_->setOption(zygisk::Option::DLCLOSE_MODULE_LIBRARY);
             return;
         }

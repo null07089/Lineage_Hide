@@ -86,9 +86,9 @@ jobs:
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             version="${GITHUB_REF_NAME#v}"
           elif [[ "${GITHUB_REF_NAME}" == "Dev" || "${GITHUB_REF_NAME}" == "dev" ]]; then
-            version="1.5.1-dev (${run_number}-${short_sha})"
+            version="1.5.2-dev (${run_number}-${short_sha})"
           else
-            version="1.5.1 (${run_number}-${short_sha})"
+            version="1.5.2 (${run_number}-${short_sha})"
           fi
           # versionCode is maintained in module.prop so release tags keep the
           # expected value (v2.0 -> 2) and Magisk update checks stay monotonic.

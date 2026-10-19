@@ -437,6 +437,21 @@ pm disable org.lineageos.jelly
 
 pm list packages -s | sed 's/^package://' | sort -u > "${0%/*}/system_packages.txt"
 
+# Persistent per-app exemption list.  Prefer the copy outside the module
+# directory so it survives module updates; migrate the legacy file once.
+mkdir -p "/data/adb/lineage_hide"
+if [ ! -f "/data/adb/lineage_hide/exempt.txt" ]; then
+    if [ -f "${0%/*}/exempt.txt" ]; then
+        cp "${0%/*}/exempt.txt" "/data/adb/lineage_hide/exempt.txt"
+    else
+        cat > "/data/adb/lineage_hide/exempt.txt" << 'EOF'
+# Lineage Hide exemptions: one package name per line.
+# Listed third-party processes are never injected.
+# Example: com.example.detector
+EOF
+    fi
+fi
+
 until dumpsys window policy | awk '/showing=false/ { a=1 }; /inputRestricted=false/ { b=1 }; END { exit !(a && b) }'
 do
     sleep 1

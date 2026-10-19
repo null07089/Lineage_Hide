@@ -39,6 +39,10 @@ it:
   register ROM-named files with `add_sus_path`, their mappings and idmaps with
   `add_sus_map`, and to delete or scrub lineage system properties with
   `resetprop`;
+- `post-fs-data.sh` registers the Zygisk Next library and the module's own
+  `zygisk/arm64-v8a.so` with `add_sus_map` *before* zygote maps them, so the
+  mappings inherited by applications never expose a `zygisk` path in
+  `/proc/self/maps`;
 - it also hides the module's own `zygisk/arm64-v8a.so` and the Zygisk library
   from application `/proc/self/maps`;
 - `/proc/<pid>/fd/*` readlink targets inherited from zygote need the kernel
@@ -62,10 +66,16 @@ never write into Binder reply buffers.
 
 ## Injection scope
 
-There is no configuration.  The module injects a process when:
+The module never injects an app zygote (`is_child_zygote`) or an isolated
+process (uid 90000–99999).  Both are used as environment probes: an injected
+app zygote changes the fork/logger order a detector can observe, and an
+isolated process is expected to run without the application's Zygisk state.
+The application's normal processes are still injected, so hiding is unchanged.
+
+For every remaining process the module injects when:
 
 1. its uid is an application uid (`>= 10000`), and
-2. its package is not a system package.
+2. its package is neither a system package nor exempted.
 
 `service.sh` records the system packages at every boot
 (`/data/adb/modules/lineage_hide/system_packages.txt`, generated from
@@ -74,8 +84,23 @@ boot window before that list exists, a small hardcoded fallback protects
 SystemUI, Settings, the permission controller, core providers, core services
 and `org.lineageos.*` apps.  `FORCE_DENYLIST_UNMOUNT` is always requested.
 
-To exclude an app, freeze it from the module by adding its package to
-`system_packages.txt` (the file is regenerated on the next boot).
+To exclude a third-party app, add its package name to
+`/data/adb/lineage_hide/exempt.txt` (one per line, `#` starts a comment).  The
+file is outside the module directory, so it survives module updates; the old
+`/data/adb/modules/lineage_hide/exempt.txt` location is still read.
+
+## If an app exits immediately
+
+Some detectors (for example `com.chunqiunativecheck`) send themselves
+`SIGKILL` when an anti-tamper probe sees a Zygisk artifact, so `logcat` shows
+no tombstone and the process simply disappears.  Lineage Hide avoids the two
+probes it can control: app zygotes and isolated processes are never injected,
+and `post-fs-data.sh` registers the Zygisk libraries before zygote maps them.
+For the remaining in-process probes, enable Zygisk Next's “linker” and
+“anonymous memory” options and set its exclusion policy to “restore mounts
+only”.  If the app still exits, add its package to
+`/data/adb/lineage_hide/exempt.txt`: it then runs unmodified and can see the
+real ROM, but it no longer crashes.
 
 ## Boot integration (`service.sh`)
 
