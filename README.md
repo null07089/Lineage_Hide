@@ -5,6 +5,10 @@
 Lineage Hide is a Zygisk module that removes LineageOS and other custom-ROM
 fingerprints from applications.  Every third-party app is covered.
 
+> **中文简介**：Lineage Hide 是一个用于隐藏 LineageOS / 自定义 ROM 指纹的
+> Zygisk 模块，对全部三方应用生效。完整中文文档见
+> [README.zh-CN.md](README.zh-CN.md)。
+
 ## Contents
 
 - [Installation](#installation)
