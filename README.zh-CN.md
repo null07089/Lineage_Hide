@@ -5,6 +5,24 @@
 Lineage Hide 是一个 Zygisk 模块，用于隐藏 LineageOS / 自定义 ROM 指纹。
 **全部三方应用生效**
 
+## 目录
+
+- [安装](#安装)
+- [兼容性](#兼容性)
+- [演示](#演示)
+- [与 SUSFS 搭配（重要）](#与-susfs-搭配重要)
+- [Zygisk Next 重要配置（否则部分应用会闪退）](#zygisk-next-重要配置否则部分应用会闪退)
+- [隐藏通道总览](#隐藏通道总览)
+- [注入范围（无配置）](#注入范围无配置)
+- [启动集成（service.sh）](#启动集成servicesh)
+- [内核侧路径隐藏](#内核侧路径隐藏)
+- [KernelSU SELinux 状态加固](#kernelsu-selinux-状态加固)
+- [构建与发布](#构建与发布)
+- [分阶段验证](#分阶段验证)
+- [设计约束与经验](#设计约束与经验)
+- [目录结构](#目录结构)
+- [许可证](#许可证)
+
 ## 安装
 
 1. 在 Magisk / KernelSU 管理器中刷入 `Lineage_Hide.zip` 并重启设备；
@@ -297,3 +315,9 @@ scripts/
   verify_stealth.sh          ELF 符号与 /proc maps 辅助验证（开发用）
 images/                      README 截图（演示、配置）
 ```
+
+## 许可证
+
+Copyright (C) 2026 GitHub@null07089。
+
+本项目以 GNU General Public License v3.0 发布，详见 [LICENSE](LICENSE)。

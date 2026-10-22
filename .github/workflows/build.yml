@@ -83,12 +83,15 @@ jobs:
           set -euo pipefail
           short_sha="${GITHUB_SHA:0:7}"
           run_number="${GITHUB_RUN_NUMBER}"
+          # Branch builds derive the version from module.prop so it never goes
+          # stale; tag builds use the tag itself.
+          base_version="$(grep '^version=' module/module.prop | cut -d= -f2-)"
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             version="${GITHUB_REF_NAME#v}"
           elif [[ "${GITHUB_REF_NAME}" == "Dev" || "${GITHUB_REF_NAME}" == "dev" ]]; then
-            version="2.0-dev (${run_number}-${short_sha})"
+            version="${base_version}-dev (${run_number}-${short_sha})"
           else
-            version="2.0 (${run_number}-${short_sha})"
+            version="${base_version} (${run_number}-${short_sha})"
           fi
           # versionCode is maintained in module.prop and increments on every
           # release, so manager update checks stay monotonic.

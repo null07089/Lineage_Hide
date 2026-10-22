@@ -5,6 +5,24 @@
 Lineage Hide is a Zygisk module that removes LineageOS and other custom-ROM
 fingerprints from applications.  Every third-party app is covered.
 
+## Contents
+
+- [Installation](#installation)
+- [Compatibility](#compatibility)
+- [Demo](#demo)
+- [Pairing with SUSFS (important)](#pairing-with-susfs-important)
+- [Important Zygisk Next settings (otherwise some apps crash)](#important-zygisk-next-settings-otherwise-some-apps-crash)
+- [Hidden channels](#hidden-channels)
+- [Injection scope](#injection-scope)
+- [Boot integration (`service.sh`)](#boot-integration-servicesh)
+- [Kernel-side path hiding](#kernel-side-path-hiding)
+- [KernelSU selinux_hide hardening](#kernelsu-selinux_hide-hardening)
+- [Build](#build)
+- [Verification](#verification)
+- [Design notes](#design-notes)
+- [Directory structure](#directory-structure)
+- [License](#license)
+
 ## Installation
 
 1. Flash `Lineage_Hide.zip` in Magisk or KernelSU and reboot;
@@ -262,16 +280,61 @@ Quick checks; the detailed checklist is in
 - `logcat -s LineageHide` shows the hook installation lines; `service.sh`
   output appears in the kernel/manager log.
 
-## Boundaries
+## Design notes
 
-- Zygisk keeps the module `.so` mapped in zygote.  Updates require a reboot,
-  and replacing the file under a live mapping can crash processes.
-- `PendingIntent`-relayed broadcasts, native-only Binder lookups and native
-  reflection are outside the current scope.
-- The OnePlus 8T service list is a fixed snapshot; a ROM update that changes
-  the service set can make it stale until the wrapper is regenerated.
-- Hiding a core system library such as `/system/lib64/libstagefright.so` can
-  have unknown side effects, so it is not registered by default; uncomment
-  line 511 of `service.sh` to enable it.
-- Without SUSFS and the kernel patch, native scanners can still observe ROM
+- **Never write into a Binder reply Parcel.** A reply may be a data-reference
+  into the binder buffer; rewriting it in place caused `Parcel::writeInt32`
+  SIGSEGV in several apps.  Feature enumeration is replaced on the read side,
+  broadcasts and service lookups are rewritten in private request copies.
+- **Never close fds owned by the resource system.** The overlay/platform-res
+  fds inherited from zygote belong to `ZipArchive`; an external `close()`
+  triggers fdsan and SIGABRT.  The kernel patch covers their path exposure
+  instead.
+- **A module update requires a reboot.** Zygote keeps the module `.so` mapped;
+  hot-replacing a mapped file mixes old and new pages and crashes zygote.
+- **Native boundary.** The in-process hooks only cover Java/framework paths;
+  native libc scans, native-only Binder calls and `PendingIntent`-relayed
+  broadcasts are out of scope and need SUSFS plus the kernel patch.
+- **Keep the hiding surface small.** Every hook is another observable; the
+  native-ineffective list0/readlink hooks were removed and only working
+  channels remain.
+- **Do not hide core system libraries.** `/system/lib64/libstagefright.so` is
+  not registered by default because hiding a core system library can have
+  unknown side effects; uncomment line 511 of `service.sh` after confirming
+  there is no impact.
+- **The OnePlus 8T service list is a fixed snapshot.** When a ROM update
+  changes the service set, the wrapper must be regenerated to match.
+- **Without SUSFS and the kernel patch**, native scanners can still observe ROM
   files, mappings and properties from application processes.
+
+## Directory structure
+
+```
+module/                      Magisk/KernelSU module
+  module.prop                module identity (id=lineage_hide)
+  service.sh                 boot: pm/service scrubbing + bootloader spoofing + system package list + ksu_susfs registration
+  customize.sh               installer (permissions)
+  src/main/cpp/              Zygisk native code
+    entry.cpp                injection decision (uid + system package list) and specialization entry
+    binder_hook.{h,cpp}      ServiceManager BinderProxy JNI hook and filtering
+    service_filter.{h,cpp}   service name matching
+    service_cache.{h,cpp}    sCache cleanup
+    resource_hook.{h,cpp}    resource package hiding
+    feature_filter.{h,cpp}   system features
+    broadcast_filter.{h,cpp} protected broadcasts
+    reflection_filter.{h,cpp} LINEAGE_APK_PATH reflection
+    log.{h,cpp}              logging
+scripts/
+  package.sh                 package Lineage_Hide.zip
+  patch-kernel.sh            kernel procfs path scrubbing patch
+  selinux_hide_patch.sh      KernelSU selinux_hide privileged-context probe guards
+  verify_stealth.sh          ELF symbol and /proc maps helper checks (development)
+images/                      README screenshots (demo, settings)
+```
+
+## License
+
+Copyright (C) 2026 GitHub@null07089.
+
+This project is licensed under the GNU General Public License v3.0; see
+[LICENSE](LICENSE).
