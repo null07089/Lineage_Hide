@@ -28,6 +28,13 @@ Lineage Hide 是一个 Zygisk 模块，用于隐藏 LineageOS / 自定义 ROM �
   <img src="images/system-update.png" width="280" alt="设置-系统更新：系统应用内 LineageOS 仍正常可见">
 </p>
 
+抖音登录成功示例（OnePlus 8T）：
+
+<p align="center">
+  <img src="images/douyin-login.jpg" width="280" alt="抖音：登录成功，进入欢迎页">
+  <img src="images/douyin-device-management.png" width="280" alt="抖音：登录设备管理显示 OnePlus 8T 本机">
+</p>
+
 ## 与 SUSFS 搭配（重要）
 
 模块只能改变“目标进程内能看到什么”。内核对外报告的内容——路径可见性、已经打开

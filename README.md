@@ -30,6 +30,13 @@ Demo video of the hiding effect of this project: <https://b23.tv/437BHCi>
   <img src="images/system-update.png" width="280" alt="Settings / system update — LineageOS stays visible in system apps">
 </p>
 
+Douyin login succeeds on a OnePlus 8T:
+
+<p align="center">
+  <img src="images/douyin-login.jpg" width="280" alt="Douyin — login succeeds and the welcome page appears">
+  <img src="images/douyin-device-management.png" width="280" alt="Douyin — login device management lists this OnePlus 8T">
+</p>
+
 ## Pairing with SUSFS (important)
 
 The module only changes what a target *process* can observe.  What the kernel
