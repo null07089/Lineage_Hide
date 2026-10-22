@@ -9,6 +9,8 @@ Lineage Hide 是一个 Zygisk 模块，用于隐藏 LineageOS / 自定义 ROM �
 - 测试通过：OnePlus 8T，LineageOS 24（Android 17）；
 - 安装模块后如果暴露 `/system/bin/service` 挂载点，需要安装元模块（MetaModule）：
   <https://kernelsu.org/guide/metamodule.html>；
+- 一加欧版机型请安装官方“软件商店”，否则部分应用的特征检查会命中：
+  <https://www.oppomobile.com/m/store.html>；
 - **部分软件无法打开**：请改用这个 Zygisk Next 版本
   <https://t.me/c/2022002916/124739>
   （新版 Zygisk 注入实现在 360 加壳应用上存在自旋问题）
@@ -91,7 +93,12 @@ SystemUI、Settings、权限控制器、核心 providers、核心服务与 `org.
 
 开机动画启动后，模块会：
 
-1. 隐藏 service 列表：
+1. 隐藏 `pm` 命令探测：把 `/system/bin/pm` 备份为 `/data/system/pm_`，wrapper
+   写到 `/data/system/pm`，再用 `nsenter -m -t 1` 在 init mount namespace 里
+   bind mount 到 `/system/bin/pm`；wrapper 把调用转给 `cmd package`，对应用
+   进程（uid ≥ 10000）的输出做等长 `lineage` → `lineagx`、
+   `Lineage` → `Lineagx` 改写；
+2. 隐藏 service 列表：
    - OnePlus 8T（`ro.product.model=KB2000`）把 `/` 重挂为可写，备份
      `/system/bin/service` 为 `service_`，写入一个对 `service list` 返回
      392 项定制静态列表的 wrapper；
@@ -101,27 +108,31 @@ SystemUI、Settings、权限控制器、核心 providers、核心服务与 `org.
      `/system/bin/service`；
    - 8T wrapper 对非 `list` 调用、通用 wrapper 对所有输出做等长
      `lineage` → `lineagx` 改写；
-2. 把 `/system`、`/product/etc`、`/system_ext/etc`、
+3. 把 `/system`、`/product/etc`、`/system_ext/etc`、
    `/system/system_dlkm/etc` 的 `build.prop` 中 `userdebug` 改写为 `user`，
    不再暴露调试构建信息；
-3. 伪装 bootloader / verified boot 状态：`ro.boot.flash.locked=1`、
+4. 伪装 bootloader / verified boot 状态：`ro.boot.flash.locked=1`、
    `ro.boot.verifiedbootstate=green`、`ro.boot.vbmeta.device_state=locked`、
    `ro.boot.vbmeta.*`，以及 `ro.debuggable=0`、`ro.force.debuggable=0`、
    `ro.secure=1`、`ro.adb.secure=1`、`ro.build.type=user`、
    `ro.build.tags=release-keys`、recovery 状态的 `ro.bootmode` 与
-   `init.svc.adb_root`；
-4. 删除名称含 `lineage` 的系统属性，改写值中含 `lineage` 的属性；
-5. 禁用 `org.lineageos.jelly`，生成系统包清单（供注入范围判断使用）；
-6. 开启 SUSFS 的 `hide_sus_mnts_for_non_su_procs` 与
+   `init.svc.adb_root`，并把 `ro.config.ringtone` 改写为 `unknown`；
+5. 删除名称含 `lineage` 的系统属性，改写值中含 `lineage` 的属性；
+6. 禁用 `org.lineageos.jelly`，生成系统包清单（供注入范围判断使用）；
+7. 开启 SUSFS 的 `hide_sus_mnts_for_non_su_procs` 与
    `enable_avc_log_spoofing`，然后遍历 `/data/resource-cache`、`/system`、
    `/vendor`、`/system_ext`、`/product` 中带 `*lineage*` 和 `*gapps*`
    的条目，交给 `ksu_susfs add_sus_path`（普通文件同时 `add_sus_map`）；
-7. 追加注册：`addon.d`、LineageOS 更新目录、SELinux 策略文件、平台资源包的
+8. 追加注册：`addon.d`、LineageOS 更新目录、SELinux 策略文件、平台资源包的
    RRO 与 idmap、模块自身 native 库与 Zygisk 库。
 
-service 列表步骤只有 OnePlus 8T 会重挂并写入系统分区；通用 bind mount 分支
-不修改系统分区。第 2 步会重挂对应分区并在完成后挂回只读，无法重挂时文件改写
-不生效，但第 3 步的属性伪装仍能覆盖应用运行时读到的值。所有步骤都是幂等的，
+`/system/lib64/libstagefright.so` 默认不再注册为 `sus_path`，避免隐藏核心系统库
+带来未知副作用；确需隐藏时去掉 `service.sh` 第 511 行注释。
+
+`pm` 与 service 的 wrapper 只对应用进程（uid ≥ 10000）去特征，root/shell 仍得到
+原始输出。service 列表步骤只有 OnePlus 8T 会重挂并写入系统分区；通用 bind mount
+分支不修改系统分区。第 3 步会重挂对应分区并在完成后挂回只读，无法重挂时文件改写
+不生效，但第 4 步的属性伪装仍能覆盖应用运行时读到的值。所有步骤都是幂等的，
 重启重复执行没有副作用。与进程内钩子不同，属性改写和 SUSFS 注册是全局生效的。
 
 ## 内核侧路径隐藏
@@ -209,14 +220,18 @@ bash scripts/package.sh
 8. **内核补丁**：应用 `/proc/self/fd/*` 的 readlink 目标含关键词时显示为
    等长改写（如 `lineagx`）；root 进程不受影响；
 9. **服务列表**：OnePlus 8T 上 `service list` 返回 392 项静态列表；其他机型
-   不应出现含 `lineage` 的服务名；
-10. **Bootloader 属性**：`getprop ro.boot.flash.locked` 为 `1`，
+   不应出现含 `lineage` 的服务名；root/shell 仍为原始输出；
+10. **pm 命令**：应用内 `pm list packages` 输出不含 `lineage`（显示为
+    `lineagx`）；root/shell 中仍为原始输出；
+11. **Bootloader 属性**：`getprop ro.boot.flash.locked` 为 `1`，
     `ro.boot.verifiedbootstate` 为 `green`，`ro.boot.vbmeta.device_state`
-    为 `locked`，`ro.build.type` 为 `user`，`ro.debuggable` 为 `0`；
-11. **KSU 特权探针**：开启 `selinux_hide` 后，应用内经
+    为 `locked`，`ro.build.type` 为 `user`，`ro.debuggable` 为 `0`，
+    `ro.config.ringtone` 为 `unknown`；
+12. **KSU 特权探针**：开启 `selinux_hide` 后，应用内经
     `/sys/fs/selinux/context`、`/sys/fs/selinux/access` 或 setprocattr 探测
     `u:r:adbroot:s0`、`u:r:shell:s0`→`u:r:su:s0` 均返回 `EINVAL`；
-    root/shell 进程不受影响。
+    root/shell 进程不受影响；
+13. **抖音**：抖音可正常启动并通过环境检测。
 
 ## 设计约束与经验
 
@@ -233,6 +248,9 @@ bash scripts/package.sh
   补齐；
 - **隐藏本身要尽量小。** 每多一个钩子就多一份可观测面；已移除对 native 无效的
   list0/readlink 钩子，只保留确有作用的通道；
+- **不要隐藏核心系统库。** `/system/lib64/libstagefright.so` 的 `sus_path` 默认
+  关闭，隐藏核心系统库可能带来未知副作用；确认无影响后再打开 `service.sh`
+  第 511 行；
 - **OnePlus 8T 服务列表是静态快照。** ROM 更新改变服务集合后，需要重新生成
   wrapper 才能同步。
 
@@ -240,8 +258,8 @@ bash scripts/package.sh
 
 ```
 module/                      Magisk/KernelSU 模块
-  module.prop                模块标识（id=lineage_hide，version=1.5.1）
-  service.sh                 开机：服务列表/bootloader 属性伪装 + 系统包清单 + ksu_susfs 注册
+  module.prop                模块标识（id=lineage_hide，version=2.0）
+  service.sh                 开机：pm/service 去特征 + bootloader 属性伪装 + 系统包清单 + ksu_susfs 注册
   customize.sh               安装脚本（权限）
   src/main/cpp/              Zygisk native 代码
     entry.cpp                注入判定（uid + 系统包清单）与 specialization 入口

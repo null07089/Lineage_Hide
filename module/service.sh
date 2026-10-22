@@ -4,15 +4,23 @@ resetprop -w init.svc.bootanim running
 
 [ $(realpath "/proc/$$/exe") != "/system/bin/sh" ] && exec "/system/bin/sh" "$0"
 
+cat "/system/bin/pm" > "/data/system/pm_"
+echo $'#!/system/bin/sh\n[ $(exec /system/bin/id -u) -lt 10000 ] && exec /system/bin/cmd package "$@"\nexec /system/bin/cmd package "$@" | exec /system/bin/sed \'s/lineage/lineagx/g; s/Lineage/Lineagx/g\'' > "/data/system/pm"
+chmod "$(stat -c "%a" "/system/bin/pm")" "/data/system/pm" "/data/system/pm_"
+chown "$(stat -c "%u:%g" "/system/bin/pm")" "/data/system/pm" "/data/system/pm_"
+chcon "$(stat -c "%C" "/system/bin/pm")" "/data/system/pm" "/data/system/pm_"
+nsenter -m -t 1 -- mount --bind "/data/system/pm" "/system/bin/pm"
+
 [ "$(getprop ro.product.model)" = "KB2000" ] && (
-    [ -f "/system/bin/service_" ] && exit
+    if [ -f "/system/bin/service_" ] && grep -q 'id -u) -lt 10000' "/system/bin/service" 2>/dev/null; then exit; fi
     mount -o remount,rw /
-    cp -a "/system/bin/service" "/system/bin/service_"
+    [ -f "/system/bin/service_" ] || cp -a "/system/bin/service" "/system/bin/service_"
     cat > "/system/bin/service" << 'EOF_'
 #!/system/bin/sh
+[ $(exec /system/bin/id -u) -lt 10000 ] && exec /system/bin/service_ "$@"
 case "$@" in
     "list")
-        exec cat << 'EOF'
+        exec /system/bin/cat << 'EOF'
 Found 392 services:
 0	AtlasService: [android.atlas.service]
 1	DockObserver: []
@@ -409,14 +417,14 @@ Found 392 services:
 EOF
     ;;
     *)
-        exec "/system/bin/service_" "$@" | sed 's/lineage/lineagx/g; s/Lineage/Lineagx/g'
+        exec "/system/bin/service_" "$@" | exec /system/bin/sed 's/lineage/lineagx/g; s/Lineage/Lineagx/g'
     ;;
 esac
 EOF_
     mount -o remount,ro "/"
 ) || {
     cat "/system/bin/service" > "/data/system/service_"
-    echo $'#!/system/bin/sh\nexec "/data/system/service_" "$@" | sed \'s/lineage/lineagx/g; s/Lineage/Lineagx/g\'' > "/data/system/service"
+    echo $'#!/system/bin/sh\n[ $(exec /system/bin/id -u) -lt 10000 ] && exec "/data/system/service_" "$@"\nexec "/data/system/service_" "$@" | exec /system/bin/sed \'s/lineage/lineagx/g; s/Lineage/Lineagx/g\'' > "/data/system/service"
     chmod "$(stat -c "%a" "/system/bin/service")" "/data/system/service" "/data/system/service_"
     chown "$(stat -c "%u:%g" "/system/bin/service")" "/data/system/service" "/data/system/service_"
     chcon "$(stat -c "%C" "/system/bin/service")" "/data/system/service" "/data/system/service_"
@@ -476,6 +484,8 @@ resetprop -n ro.boot.vbmeta.size "4096"
 
 resetprop -n init.svc.adb_root ""
 
+resetprop -n ro.config.ringtone "unknown"
+
 resetprop | awk -F '\\[|\\]: \\[|\\]' '/lineage/ {
     key=$2
     value=$3
@@ -498,7 +508,7 @@ done
 
 ksu_susfs add_sus_path "/system/addon.d"
 ksu_susfs add_sus_path "/data/lineageos_updates"
-ksu_susfs add_sus_path "/system/lib64/libstagefright.so"
+# ksu_susfs add_sus_path_loop "/system/lib64/libstagefright.so"
 ksu_susfs add_sus_path "/data/adbroot"
 
 ksu_susfs add_sus_path_loop "/vendor/etc/selinux/vendor_file_contexts"

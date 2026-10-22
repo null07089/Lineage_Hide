@@ -1,7 +1,7 @@
 id=lineage_hide
 name=Lineage Hide
-version=1.5.1
-versionCode=7
+version=2.0
+versionCode=8
 author=GitHub@null07089
 description=Hide custom ROM signals in target apps; pairs with SUSFS for file/property fingerprints
 updateJson=https://raw.githubusercontent.com/null07089/Lineage_Hide/main/update.json

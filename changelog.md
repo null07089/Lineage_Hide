@@ -1,5 +1,12 @@
 # 更新日志
 
+## 2.0
+
+- 新增抖音过检：`service.sh` 包装 `pm` 命令，应用进程内输出中的 `lineage` 等长改写为 `lineagx`，并把 `ro.config.ringtone` 改写为 `unknown`
+- `pm`/`service` 的去特征只对 uid ≥ 10000 的应用进程生效，root/shell 保持原始输出
+- 取消注册 `/system/lib64/libstagefright.so` 的 `sus_path`，避免隐藏核心系统库带来未知副作用；需要隐藏时去掉 `service.sh` 第 511 行注释
+- 一加欧版机型请安装官方“软件商店”以通过特征检查：<https://www.oppomobile.com/m/store.html>
+
 ## 1.5.1
 
 - `service.sh` 统一改用 `/system/bin/sh` 执行，避免部分环境下解释器不一致

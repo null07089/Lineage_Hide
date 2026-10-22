@@ -10,6 +10,9 @@ fingerprints from applications.  Every third-party app is covered
 - If the `/system/bin/service` mount point is still exposed after installing
   the module, install the MetaModule:
   <https://kernelsu.org/guide/metamodule.html>;
+- On OnePlus EU models, install the official App Market or some apps' feature
+  checks will be triggered:
+  <https://www.oppomobile.com/m/store.html>;
 - **If some applications fail to open**, switch to this Zygisk Next build:
   <https://t.me/c/2022002916/124739> — the newer Zygisk injection
   implementation has a spin issue when injecting 360-hardened apps.
@@ -98,7 +101,13 @@ To exclude an app, freeze it from the module by adding its package to
 
 After the boot animation starts, the module:
 
-1. hides the service list.  On a OnePlus 8T (`ro.product.model=KB2000`) it
+1. hides the `pm` command: `/system/bin/pm` is copied to `/data/system/pm_`,
+   a wrapper is written to `/data/system/pm` and bind-mounted over
+   `/system/bin/pm` in init's mount namespace with `nsenter -m -t 1`.  The
+   wrapper forwards calls to `cmd package` and, for application processes
+   (uid >= 10000), rewrites `lineage` → `lineagx` and `Lineage` → `Lineagx`
+   in the output;
+2. hides the service list.  On a OnePlus 8T (`ro.product.model=KB2000`) it
    remounts `/` read-write, backs up `/system/bin/service` as `service_` and
    writes a wrapper whose `service list` output is a fixed 392-entry list.  On
    every other device, or when the OnePlus path fails, it leaves the system
@@ -108,36 +117,42 @@ After the boot animation starts, the module:
    `nsenter -m -t 1`.  The OnePlus wrapper filters non-`list` output; the
    generic wrapper filters all output, both with the length-preserving
    `lineage` → `lineagx` rewrite;
-2. rewrites `userdebug` to `user` in the `build.prop` files of `/system`,
+3. rewrites `userdebug` to `user` in the `build.prop` files of `/system`,
    `/product/etc`, `/system_ext/etc` and `/system/system_dlkm/etc`, so the
    device no longer advertises debug build information;
-3. spoofs bootloader and verified-boot properties: `ro.boot.flash.locked=1`,
+4. spoofs bootloader and verified-boot properties: `ro.boot.flash.locked=1`,
    `ro.boot.verifiedbootstate=green`, `ro.boot.vbmeta.device_state=locked`,
    `ro.boot.vbmeta.avb_version`, `ro.boot.vbmeta.hash_alg`,
    `ro.boot.vbmeta.size`, plus `ro.debuggable=0`, `ro.force.debuggable=0`,
    `ro.secure=1`, `ro.adb.secure=1`, `ro.build.type=user`,
    `ro.build.tags=release-keys`, a recovery `ro.bootmode` and
-   `init.svc.adb_root`;
-4. deletes system properties whose name contains `lineage` and rewrites values
+   `init.svc.adb_root`, and sets `ro.config.ringtone` to `unknown`;
+5. deletes system properties whose name contains `lineage` and rewrites values
    that contain `lineage`;
-5. disables `org.lineageos.jelly` and records the system package list used by
+6. disables `org.lineageos.jelly` and records the system package list used by
    the injection scope above;
-6. enables the SUSFS `hide_sus_mnts_for_non_su_procs` and
+7. enables the SUSFS `hide_sus_mnts_for_non_su_procs` and
    `enable_avc_log_spoofing` switches, then walks `/data/resource-cache`,
    `/system`, `/vendor`, `/system_ext` and `/product` for `*lineage*` and
    `*gapps*` entries and registers them with `ksu_susfs add_sus_path`
    (`add_sus_map` for regular files);
-7. registers additional paths and maps: `addon.d`, the LineageOS update
+8. registers additional paths and maps: `addon.d`, the LineageOS update
    directory, SELinux policy files, the platform resource RRO and its idmaps,
    the module's own native library and the Zygisk library.
 
-The service-list step writes to the system partition only on OnePlus 8T; the
-generic bind-mount path never touches it.  Step 2 remounts each affected
-filesystem read-write and restores it read-only; where the filesystem cannot
-be remounted, the file edit has no effect, but the property spoofing in step 3
-still covers the runtime values applications read.  Every step is idempotent
-and safe to repeat on the next boot.  Unlike the in-process hooks, the property
-rewrites and SUSFS registrations are global.
+`/system/lib64/libstagefright.so` is no longer registered with `sus_path` by
+default, because hiding a core system library can have unknown side effects.
+Uncomment line 511 of `service.sh` to hide it anyway.
+
+The `pm` and service wrappers only rewrite output for application processes
+(uid >= 10000); root/shell still sees the original output.  The service-list
+step writes to the system partition only on OnePlus 8T; the generic bind-mount
+path never touches it.  Step 3 remounts each affected filesystem read-write and
+restores it read-only; where the filesystem cannot be remounted, the file edit
+has no effect, but the property spoofing in step 4 still covers the runtime
+values applications read.  Every step is idempotent and safe to repeat on the
+next boot.  Unlike the in-process hooks, the property rewrites and SUSFS
+registrations are global.
 
 ## Kernel-side path hiding
 
@@ -217,10 +232,14 @@ Quick checks; the detailed checklist with commands is in
   `NoSuchFieldException`.
 - In a system app (Settings, SystemUI, `org.lineageos.*`) all of the above must
   still be visible, since those processes are never injected.
+- `pm list packages` in a third-party app shows no `lineage` entries (they
+  appear as `lineagx`), while root/shell still sees the original output;
 - `service list` contains no ROM-named services (on KB2000 it returns the
-  static 392-entry list).  `getprop ro.boot.flash.locked` is `1`,
-  `ro.boot.verifiedbootstate` is `green`, `ro.boot.vbmeta.device_state` is
-  `locked`, `ro.build.type` is `user` and `ro.debuggable` is `0`.
+  static 392-entry list), and root/shell still sees the original output.
+  `getprop ro.boot.flash.locked` is `1`, `ro.boot.verifiedbootstate` is
+  `green`, `ro.boot.vbmeta.device_state` is `locked`, `ro.build.type` is
+  `user`, `ro.debuggable` is `0` and `ro.config.ringtone` is `unknown`.
+- Douyin launches normally and passes its environment checks.
 - `logcat -s LineageHide` shows the hook installation lines; `service.sh`
   output appears in the kernel/manager log.
 
@@ -232,5 +251,8 @@ Quick checks; the detailed checklist with commands is in
   reflection are outside the current scope.
 - The OnePlus 8T service list is a fixed snapshot; a ROM update that changes
   the service set can make it stale until the wrapper is regenerated.
+- Hiding a core system library such as `/system/lib64/libstagefright.so` can
+  have unknown side effects, so it is not registered by default; uncomment
+  line 511 of `service.sh` to enable it.
 - Without SUSFS and the kernel patch, native scanners can still observe ROM
   files, mappings and properties from application processes.
