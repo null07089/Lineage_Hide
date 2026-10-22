@@ -47,6 +47,23 @@ it:
 Without SUSFS the module still hides the five in-process channels below, but
 native file and property scanners can still fingerprint the ROM.
 
+## Important Zygisk Next settings (otherwise some apps crash)
+
+<p align="center">
+  <img src="images/zygisk-next-settings.png" width="320" alt="Zygisk Next settings: Denylist Policy set to Unmount Only, Use anonymous memory off, Use Zygisk Next linker on">
+</p>
+
+Configure Zygisk Next as shown above, or some apps — 360-hardened apps in
+particular — crash on launch:
+
+- **Denylist Policy**: `Unmount Only`, not `Enforce DenyList`;
+- **Use anonymous memory**: off;
+- **Use Zygisk Next linker**: on.
+
+The module requests `FORCE_DENYLIST_UNMOUNT` to unmount mount points inside app
+processes, so these three settings need to stay consistent with it. See the
+compatibility note above for the recommended Zygisk Next build.
+
 ## Hidden channels
 
 | Channel | Mechanism |

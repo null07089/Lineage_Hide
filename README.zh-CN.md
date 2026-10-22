@@ -43,6 +43,21 @@ Lineage Hide 是一个 Zygisk 模块，用于隐藏 LineageOS / 自定义 ROM �
 没有 SUSFS 时，模块仍能隐藏下面五类进程内信号，但 native 文件/属性扫描仍可能
 识别出 ROM。
 
+## Zygisk Next 重要配置（否则部分应用会闪退）
+
+<p align="center">
+  <img src="images/zygisk-next-settings.png" width="320" alt="Zygisk Next 设置：Denylist Policy 为 Unmount Only、Use anonymous memory 关闭、Use Zygisk Next linker 开启">
+</p>
+
+Zygisk Next 管理器里请按上图设置，否则部分应用（尤其是 360 加壳应用）会在启动时闪退：
+
+- **Denylist Policy** 选 `Unmount Only`，不要用 `Enforce DenyList`；
+- **Use anonymous memory** 关闭；
+- **Use Zygisk Next linker** 开启。
+
+模块通过 `FORCE_DENYLIST_UNMOUNT` 在应用进程内卸载挂载点，这三项设置需要与之配合。
+Zygisk Next 版本选择见上方“兼容性”一节。
+
 ## 隐藏通道总览
 
 | 通道 | 机制 |
