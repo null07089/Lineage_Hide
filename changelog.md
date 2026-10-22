@@ -6,6 +6,7 @@
 - `pm`/`service` 的去特征只对 uid ≥ 10000 的应用进程生效，root/shell 保持原始输出
 - 取消注册 `/system/lib64/libstagefright.so` 的 `sus_path`，避免隐藏核心系统库带来未知副作用；需要隐藏时去掉 `service.sh` 第 511 行注释
 - 一加欧版机型请安装官方“软件商店”以通过特征检查：<https://www.oppomobile.com/m/store.html>
+- 修复 OnePlus 8T 升级后 service wrapper 不刷新，以及通用分支 root 调用路径错误
 
 ## 1.5.1
 

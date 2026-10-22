@@ -1,21 +1,33 @@
 # Lineage Hide
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 Lineage Hide is a Zygisk module that removes LineageOS and other custom-ROM
-fingerprints from applications.  Every third-party app is covered
+fingerprints from applications.  Every third-party app is covered.
+
+## Installation
+
+1. Flash `Lineage_Hide.zip` in Magisk or KernelSU and reboot;
+2. A Zygisk implementation is required (Zygisk Next on KernelSU); apply the
+   three settings in "Important Zygisk Next settings" below;
+3. Full hiding also needs SUSFS on the kernel and, optionally, the kernel
+   patch, both described below;
+4. Updates require a reboot; see [changelog.md](changelog.md) for changes.
 
 ## Compatibility
 
 - Theoretically supports LineageOS 23.2 and newer;
 - Tested on OnePlus 8T with LineageOS 24 (Android 17);
-- If the `/system/bin/service` mount point is still exposed after installing
-  the module, install the MetaModule:
+- If the `/system/bin/service` or `/system/bin/pm` mount point is still
+  exposed after installing the module, install the MetaModule:
   <https://kernelsu.org/guide/metamodule.html>;
 - On OnePlus EU models, install the official App Market or some apps' feature
   checks will be triggered:
   <https://www.oppomobile.com/m/store.html>;
 - **If some applications fail to open**, switch to this Zygisk Next build:
   <https://t.me/c/2022002916/124739> — the newer Zygisk injection
-  implementation has a spin issue when injecting 360-hardened apps.
+  implementation has a spin issue when injecting 360-hardened apps; also apply
+  "Important Zygisk Next settings" below.
 
 ## Demo
 
@@ -230,7 +242,7 @@ module updates from the repository's releases.
 
 ## Verification
 
-Quick checks; the detailed checklist with commands is in
+Quick checks; the detailed checklist is in
 [README.zh-CN.md](README.zh-CN.md).
 
 - In a third-party app: `getSystemAvailableFeatures()` shows no

@@ -1,19 +1,31 @@
 # Lineage Hide
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 Lineage Hide 是一个 Zygisk 模块，用于隐藏 LineageOS / 自定义 ROM 指纹。
 **全部三方应用生效**
 
+## 安装
+
+1. 在 Magisk / KernelSU 管理器中刷入 `Lineage_Hide.zip` 并重启设备；
+2. 需要可用的 Zygisk 实现（KernelSU 上为 Zygisk Next），并按下文
+   「Zygisk Next 重要配置」设置三项开关；
+3. 完整隐藏还需要内核侧 SUSFS 与可选的内核补丁，见下文；
+4. 更新模块后必须重启；版本变更见 [changelog.md](changelog.md)。
+
 ## 兼容性
 
-- 理论支持 LineageOS 23.2 及以上版本；
+- 理论上支持 LineageOS 23.2 及以上版本；
 - 测试通过：OnePlus 8T，LineageOS 24（Android 17）；
-- 安装模块后如果暴露 `/system/bin/service` 挂载点，需要安装元模块（MetaModule）：
+- 安装模块后如果暴露 `/system/bin/service` 或 `/system/bin/pm` 挂载点，需要
+  安装元模块（MetaModule）：
   <https://kernelsu.org/guide/metamodule.html>；
 - 一加欧版机型请安装官方“软件商店”，否则部分应用的特征检查会命中：
   <https://www.oppomobile.com/m/store.html>；
 - **部分软件无法打开**：请改用这个 Zygisk Next 版本
   <https://t.me/c/2022002916/124739>
-  （新版 Zygisk 注入实现在 360 加壳应用上存在自旋问题）
+  （新版 Zygisk 注入实现在 360 加壳应用上存在自旋问题），并按
+  「Zygisk Next 重要配置」设置管理器；
 
 ## 演示
 
@@ -238,7 +250,7 @@ bash scripts/package.sh
     `/sys/fs/selinux/context`、`/sys/fs/selinux/access` 或 setprocattr 探测
     `u:r:adbroot:s0`、`u:r:shell:s0`→`u:r:su:s0` 均返回 `EINVAL`；
     root/shell 进程不受影响；
-13. **抖音**：抖音可正常启动并通过环境检测。
+13. **抖音**：抖音可正常启动并通过环境检测（见上方演示截图）。
 
 ## 设计约束与经验
 
@@ -265,7 +277,7 @@ bash scripts/package.sh
 
 ```
 module/                      Magisk/KernelSU 模块
-  module.prop                模块标识（id=lineage_hide，version=2.0）
+  module.prop                模块标识（id=lineage_hide）
   service.sh                 开机：pm/service 去特征 + bootloader 属性伪装 + 系统包清单 + ksu_susfs 注册
   customize.sh               安装脚本（权限）
   src/main/cpp/              Zygisk native 代码
@@ -282,6 +294,6 @@ scripts/
   package.sh                 打包 Lineage_Hide.zip
   patch-kernel.sh            内核 procfs 路径清洗补丁
   selinux_hide_patch.sh      KernelSU selinux_hide 特权上下文探针防护
-  verify_stealth.sh          adb 辅助验证
-images/                      README 演示截图
+  verify_stealth.sh          ELF 符号与 /proc maps 辅助验证（开发用）
+images/                      README 截图（演示、配置）
 ```
