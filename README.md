@@ -61,7 +61,7 @@ Demo video of the hiding effect of this project: <https://b23.tv/437BHCi>
 </p>
 <p align="center">
   <img src="images/play-integrity.png" width="280" alt="Play Integrity — BASIC, DEVICE and STRONG all pass">
-  <img src="images/system-update.png" width="280" alt="Settings / system update — LineageOS stays visible in system apps">
+  <img src="images/system-update.png" width="280" alt="System update — the LineageOS 24 update screen stays visible in the system app">
 </p>
 
 Douyin login succeeds on a OnePlus 8T:
