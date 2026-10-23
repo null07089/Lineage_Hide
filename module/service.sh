@@ -4,11 +4,10 @@ resetprop -w init.svc.bootanim running
 
 [ $(realpath "/proc/$$/exe") != "/system/bin/sh" ] && exec "/system/bin/sh" "$0"
 
-cat "/system/bin/pm" > "/data/system/pm_"
 echo $'#!/system/bin/sh\n[ $(exec /system/bin/id -u) -lt 10000 ] && exec /system/bin/cmd package "$@"\nexec /system/bin/cmd package "$@" | exec /system/bin/sed \'s/lineage/lineagx/g; s/Lineage/Lineagx/g\'' > "/data/system/pm"
-chmod "$(stat -c "%a" "/system/bin/pm")" "/data/system/pm" "/data/system/pm_"
-chown "$(stat -c "%u:%g" "/system/bin/pm")" "/data/system/pm" "/data/system/pm_"
-chcon "$(stat -c "%C" "/system/bin/pm")" "/data/system/pm" "/data/system/pm_"
+chmod "$(stat -c "%a" "/system/bin/pm")" "/data/system/pm"
+chown "$(stat -c "%u:%g" "/system/bin/pm")" "/data/system/pm"
+chcon "$(stat -c "%C" "/system/bin/pm")" "/data/system/pm"
 nsenter -m -t 1 -- mount --bind "/data/system/pm" "/system/bin/pm"
 
 [ "$(getprop ro.product.model)" = "KB2000" ] && (
