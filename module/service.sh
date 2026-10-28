@@ -4,11 +4,10 @@ resetprop -w init.svc.bootanim running
 
 [ $(realpath "/proc/$$/exe") != "/system/bin/sh" ] && exec "/system/bin/sh" "$0"
 
-cat "/system/bin/pm" > "/data/system/pm_"
 echo $'#!/system/bin/sh\n[ $(exec /system/bin/id -u) -lt 10000 ] && exec /system/bin/cmd package "$@"\nexec /system/bin/cmd package "$@" | exec /system/bin/sed \'s/lineage/lineagx/g; s/Lineage/Lineagx/g\'' > "/data/system/pm"
-chmod "$(stat -c "%a" "/system/bin/pm")" "/data/system/pm" "/data/system/pm_"
-chown "$(stat -c "%u:%g" "/system/bin/pm")" "/data/system/pm" "/data/system/pm_"
-chcon "$(stat -c "%C" "/system/bin/pm")" "/data/system/pm" "/data/system/pm_"
+chmod "$(stat -c "%a" "/system/bin/pm")" "/data/system/pm"
+chown "$(stat -c "%u:%g" "/system/bin/pm")" "/data/system/pm"
+chcon "$(stat -c "%C" "/system/bin/pm")" "/data/system/pm"
 nsenter -m -t 1 -- mount --bind "/data/system/pm" "/system/bin/pm"
 
 [ "$(getprop ro.product.model)" = "KB2000" ] && (
@@ -497,6 +496,20 @@ resetprop | awk -F '\\[|\\]: \\[|\\]' '/lineage/ {
     }
 }'
 
+[ -e /sys/module/susfs_guard_lkm ] && ksu_susfs() {
+    case "$1" in
+        add_sus_path*)
+            echo "add $2" > /proc/susfs_path
+        ;;
+        add_sus_map)
+            echo "add $2" > /proc/susfs_map
+        ;;
+        *)
+            command ksu_susfs "$@"
+        ;;
+    esac
+}
+
 ksu_susfs hide_sus_mnts_for_non_su_procs 1
 ksu_susfs enable_avc_log_spoofing 1
 
@@ -508,7 +521,7 @@ done
 
 ksu_susfs add_sus_path "/system/addon.d"
 ksu_susfs add_sus_path "/data/lineageos_updates"
-# ksu_susfs add_sus_path_loop "/system/lib64/libstagefright.so"
+ksu_susfs add_sus_path_loop "/system/lib64/libstagefright.so"
 ksu_susfs add_sus_path "/data/adbroot"
 
 ksu_susfs add_sus_path_loop "/vendor/etc/selinux/vendor_file_contexts"
