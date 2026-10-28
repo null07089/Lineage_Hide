@@ -134,9 +134,9 @@ SystemUI、Settings、权限控制器、核心 providers、核心服务与 `org.
 
 开机动画启动后，模块会：
 
-1. 隐藏 `pm` 命令探测：把 `/system/bin/pm` 备份为 `/data/system/pm_`，wrapper
-   写到 `/data/system/pm`，再用 `nsenter -m -t 1` 在 init mount namespace 里
-   bind mount 到 `/system/bin/pm`；wrapper 把调用转给 `cmd package`，对应用
+1. 隐藏 `pm` 命令探测：wrapper 写到 `/data/system/pm`，再用
+   `nsenter -m -t 1` 在 init mount namespace 里 bind mount 到
+   `/system/bin/pm`；wrapper 把调用转给 `cmd package`，对应用
    进程（uid ≥ 10000）的输出做等长 `lineage` → `lineagx`、
    `Lineage` → `Lineagx` 改写；
 2. 隐藏 service 列表：
@@ -167,8 +167,8 @@ SystemUI、Settings、权限控制器、核心 providers、核心服务与 `org.
 8. 追加注册：`addon.d`、LineageOS 更新目录、SELinux 策略文件、平台资源包的
    RRO 与 idmap、模块自身 native 库与 Zygisk 库。
 
-`/system/lib64/libstagefright.so` 默认不再注册为 `sus_path`，避免隐藏核心系统库
-带来未知副作用；确需隐藏时去掉 `service.sh` 第 511 行注释。
+SUSFS 以内核模块（LKM）方式提供时，path/map 注册改用 `/proc/susfs_path`
+与 `/proc/susfs_map`。
 
 `pm` 与 service 的 wrapper 只对应用进程（uid ≥ 10000）去特征，root/shell 仍得到
 原始输出。service 列表步骤只有 OnePlus 8T 会重挂并写入系统分区；通用 bind mount
@@ -289,9 +289,6 @@ bash scripts/package.sh
   补齐；
 - **隐藏本身要尽量小。** 每多一个钩子就多一份可观测面；已移除对 native 无效的
   list0/readlink 钩子，只保留确有作用的通道；
-- **不要隐藏核心系统库。** `/system/lib64/libstagefright.so` 的 `sus_path` 默认
-  关闭，隐藏核心系统库可能带来未知副作用；确认无影响后再打开 `service.sh`
-  第 511 行；
 - **OnePlus 8T 服务列表是静态快照。** ROM 更新改变服务集合后，需要重新生成
   wrapper 才能同步。
 

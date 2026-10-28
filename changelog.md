@@ -1,12 +1,26 @@
 # 更新日志 / Changelog
 
+## 2.1
+
+### 中文
+
+- 去除多余的 `pm_` 备份文件产生
+- 恢复默认隐藏指纹库
+- 新增 SUSFS LKM 方式隐藏 path/maps 指纹特征
+
+### English
+
+- Removed redundant `pm_` backup file creation
+- Restored default fingerprint library hiding
+- Added SUSFS LKM-based path/maps fingerprint hiding
+
 ## 2.0
 
 ### 中文
 
 - 新增抖音过检：`service.sh` 包装 `pm` 命令，应用进程内输出中的 `lineage` 等长改写为 `lineagx`，并把 `ro.config.ringtone` 改写为 `unknown`
 - `pm`/`service` 的去特征只对 uid ≥ 10000 的应用进程生效，root/shell 保持原始输出
-- 取消注册 `/system/lib64/libstagefright.so` 的 `sus_path`，避免隐藏核心系统库带来未知副作用；需要隐藏时去掉 `service.sh` 第 511 行注释
+- 取消注册 `/system/lib64/libstagefright.so` 的 `sus_path`，避免隐藏核心系统库带来未知副作用
 - 一加欧版机型请安装官方“软件商店”以通过特征检查：<https://www.oppomobile.com/m/store.html>
 - 修复 OnePlus 8T 升级后 service wrapper 不刷新，以及通用分支 root 调用路径错误
 
@@ -14,7 +28,7 @@
 
 - Added Douyin environment-check hiding: `service.sh` wraps the `pm` command and rewrites `lineage` to the equal-length `lineagx` in app-process output, and sets `ro.config.ringtone` to `unknown`
 - `pm`/service scrubbing now applies only to application processes (uid ≥ 10000); root/shell keeps the original output
-- Stopped registering `/system/lib64/libstagefright.so` as a `sus_path` to avoid unknown side effects from hiding a core system library; uncomment line 511 of `service.sh` to hide it
+- Stopped registering `/system/lib64/libstagefright.so` as a `sus_path` to avoid unknown side effects from hiding a core system library
 - OnePlus EU models should install the official App Market to pass feature checks: <https://www.oppomobile.com/m/store.html>
 - Fixed the service wrapper not refreshing after an OnePlus 8T upgrade, and the wrong root path in the generic branch
 

@@ -142,12 +142,11 @@ To exclude an app, freeze it from the module by adding its package to
 
 After the boot animation starts, the module:
 
-1. hides the `pm` command: `/system/bin/pm` is copied to `/data/system/pm_`,
-   a wrapper is written to `/data/system/pm` and bind-mounted over
-   `/system/bin/pm` in init's mount namespace with `nsenter -m -t 1`.  The
-   wrapper forwards calls to `cmd package` and, for application processes
-   (uid >= 10000), rewrites `lineage` → `lineagx` and `Lineage` → `Lineagx`
-   in the output;
+1. hides the `pm` command: a wrapper is written to `/data/system/pm` and
+   bind-mounted over `/system/bin/pm` in init's mount namespace with
+   `nsenter -m -t 1`.  The wrapper forwards calls to `cmd package` and, for
+   application processes (uid >= 10000), rewrites `lineage` → `lineagx` and
+   `Lineage` → `Lineagx` in the output;
 2. hides the service list.  On a OnePlus 8T (`ro.product.model=KB2000`) it
    remounts `/` read-write, backs up `/system/bin/service` as `service_` and
    writes a wrapper whose `service list` output is a fixed 392-entry list.  On
@@ -181,9 +180,8 @@ After the boot animation starts, the module:
    directory, SELinux policy files, the platform resource RRO and its idmaps,
    the module's own native library and the Zygisk library.
 
-`/system/lib64/libstagefright.so` is no longer registered with `sus_path` by
-default, because hiding a core system library can have unknown side effects.
-Uncomment line 511 of `service.sh` to hide it anyway.
+When SUSFS is provided as a kernel module (LKM), path/map registration uses
+`/proc/susfs_path` and `/proc/susfs_map` instead.
 
 The `pm` and service wrappers only rewrite output for application processes
 (uid >= 10000); root/shell still sees the original output.  The service-list
@@ -302,10 +300,6 @@ Quick checks; the detailed checklist is in
 - **Keep the hiding surface small.** Every hook is another observable; the
   native-ineffective list0/readlink hooks were removed and only working
   channels remain.
-- **Do not hide core system libraries.** `/system/lib64/libstagefright.so` is
-  not registered by default because hiding a core system library can have
-  unknown side effects; uncomment line 511 of `service.sh` after confirming
-  there is no impact.
 - **The OnePlus 8T service list is a fixed snapshot.** When a ROM update
   changes the service set, the wrapper must be regenerated to match.
 - **Without SUSFS and the kernel patch**, native scanners can still observe ROM
