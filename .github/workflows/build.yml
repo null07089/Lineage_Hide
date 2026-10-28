@@ -144,12 +144,30 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Prepare release notes from changelog
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          awk -v ver="${version}" '
+            $0 == "## " ver { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' changelog.md > release-notes.md
+          if [[ ! -s release-notes.md ]]; then
+            echo "[release] changelog.md has no section for ${version}" >&2
+            exit 1
+          fi
+          cat release-notes.md
+
       - name: Publish GitHub release for tag
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
+          name: Lineage Hide ${{ github.ref_name }}
+          body_path: release-notes.md
           files: out/Lineage_Hide.zip
-          generate_release_notes: true
 
       - name: Sync update manifest to main
         if: startsWith(github.ref, 'refs/tags/v')
